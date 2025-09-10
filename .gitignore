@@ -1,0 +1,22 @@
+# Ignore root files
+*.root
+
+# Ignore text files  
+*.txt
+
+# Ignore PDF files
+*.pdf
+
+# Ignore PNG images
+*.png
+
+# Ignore log files
+*.log
+
+*.eps
+
+*.tex
+
+*.card
+
+*.pyc
