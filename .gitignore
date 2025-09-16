@@ -20,3 +20,13 @@
 *.card
 
 *.pyc
+
+rootlist*
+
+Draw*
+
+*.o
+
+*.so
+
+*.hbk
