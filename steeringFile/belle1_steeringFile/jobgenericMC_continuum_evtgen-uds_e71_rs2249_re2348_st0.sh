@@ -61,7 +61,8 @@ path add_condition main =<:0:KILL
 #path add_condition main <=:0:KILL
 
 #data type: MC=1 for simulation,MC=0 for experiment.
-module put_parameter SpinAlignment  output_filename\./exp71_rs2249_re2348_evtgen-uds_0_tree.root
+module put_parameter SpinAlignment  output_filename\./exp71_rs2249_re2348_evtgen-uds_0_tree_02.root
+#module put_parameter SpinAlignment  output_filename\./basf_test.root
 #module put_parameter SpinAlignment isMCSample\1
 #module put_parameter SpinAlignment rmMCTree\0
 ##mother particle: Y1S/Y2S/Y3S/Y4S/Y4Scon(40)/Y5S
@@ -74,7 +75,7 @@ histogram define exp71_rs2249_re2348_evtgen-uds_0.hbk
 #process_url http://bweb3/montecarlo.php?ex=71&rs=2249&re=2348&ty=evtgen-uds&dt=continuum&bl=caseB&st=0
 #process_event /group/belle/bdata_b/mcprod/dat/e000065/evtgen/charm/00/all/0127/continuum/06/evtgen-charm-00-all-e000065r000626-b20090127_0910.mdst 0
 #process_event /group/belle/bdata_b/mcprod/dat/e000043/evtgen/bsbs/00/all/0127/5S_onresonance/10/evtgen-bsbs-00-all-e000043r001013-b20090127_0910.mdst 100 
-process_event /group/belle/bdata_b/dstprod/dat/e000069/HadronBJ/0127/continuum/08/HadronBJ-e000069r000823-b20090127_0910.mdst 100
+process_event /group/belle/bdata_b/dstprod/dat/e000069/HadronBJ/0127/continuum/08/HadronBJ-e000069r000823-b20090127_0910.mdst
 
 terminate
 EOF

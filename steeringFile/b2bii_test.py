@@ -31,7 +31,7 @@ if len(sys.argv) > 1:
     steering_tools.setup_IO(main)
 else:
     input_mdst = "/group/belle/bdata_b/dstprod/dat/e000069/HadronBJ/0127/continuum/08/HadronBJ-e000069r000823-b20090127_0910.mdst" 
-    output_root = "b2bii_test.root"
+    output_root = "b2bii_test02.root"
     steering_tools.setup_IO(main, input_mdst, output_root)
     
 steering_tools.setup_common_aliases()
@@ -47,6 +47,7 @@ ma.fillParticleList('pi+:track', track_cut, path=main)
 # good cluster & photon
 cluster_cut = 'E > 0.1'
 photon_cut = 'E > 0.1  and thetaInCDCAcceptance'
+photon_cut = 'E > 0.1  and theta > 17.0 and theta < 150.0'
 #ma.fillParticleList('gamma:cluster', cluster_cut, path=main)
 #ma.fillParticleList('gamma:photon', photon_cut, path=main)
 ma.cutAndCopyList("gamma:photon", "gamma:mdst", photon_cut, path = main)
@@ -57,7 +58,8 @@ nTrack_cut = "nCleanedTracks(" + track_cut + ") >= 3"
 ma.applyEventCuts(f"[{nTrack_cut}]", path=main)
 
 variables.addAlias('EnergyCMS', 'formula( useCMSFrame(totalEnergyOfParticlesInList(pi+:track)) + useCMSFrame(totalEnergyOfParticlesInList(gamma:cluster)) )')
-variables.addAlias('EvisCMS', 'formula( useCMSFrame(sumValueInList(pi+:track, E)) + useCMSFrame(sumValueInList(gamma:photon, E)) )')
+#variables.addAlias('EvisCMS', 'formula( useCMSFrame(sumValueInList(pi+:track, E)) + useCMSFrame(sumValueInList(gamma:photon, E)) )')
+variables.addAlias('EvisCMS', 'formula( useCMSFrame(totalEnergyOfParticlesInList(pi+:track)) + useCMSFrame(totalEnergyOfParticlesInList(gamma:photon)) )')
 
 variables.addAlias('BalancePzCMS', 'formula( useCMSFrame(totalPzOfParticlesInList(pi+:track))+ useCMSFrame(totalPzOfParticlesInList(gamma:photon)) )')
 
@@ -145,24 +147,12 @@ ma.variablesToNtuple('K*0:spin',
                      treename='kstar', 
                      path=main)
 
-# try ti save track and cluster , p theta phi  to a list branch in root file:
-kinematics = ['p', 'theta', 'phi']
-ma.reconstructDecay('vpho:decay -> gamma:photon pi+:track', '',
-                    allowChargeViolation=True,
-                    ignoreIfTooManyCandidates= -1 ,path = main)
-decay_vars = vu.create_aliases_for_selected(
-    list_of_variables=kinematics,
-    decay_string='vpho -> ^gamma ^pi+',
-    prefix=['isr', 'pi']
-)
-
-
 # Event-wise information for phi list in the event (common)
 main.add_module('VariablesToEventBasedTree', 
                 fileName=steering_tools.output_file, 
-                particleList='vpho:decay', 
+                particleList='pi+:track', 
                 treeName='event', 
-                event_variables=event_vars + decay_vars)
+                event_variables=event_vars)
 
 b2.process(main)
 print(b2.statistics)

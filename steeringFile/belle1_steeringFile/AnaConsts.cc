@@ -16,7 +16,8 @@
 namespace Belle {
 #endif
 
-float xmass[5]={0, 0.105658, 0.13957, 0.4937, 0.938272};
+double xmass[5]={0, 0.105658, 0.13957, 0.4937, 0.938272};
+double PI = 3.141592653589793;
 
 namespace cuts{
     double vertexZ = 3.0;
@@ -26,23 +27,6 @@ namespace cuts{
     double minNGoodTracks = 3;
     double minPt = 0.1;
 }
-
-namespace kinematics
-{
-    //double ler_e=3.499218;//energies of l, h beam
-    //double her_e(7.998213);
-    //double x_theta(0.022);
-    HepLorentzVector firstElectronCM;
-    HepLorentzVector secondElectronCM;
-    Hep3Vector CMBoost;
-    HepLorentzVector cm;
-    double Q;
-    double thrust;
-    double thrust_theta;
-    double thrust_phi;
-}
-
-double PI = 3.14159265;
 
 #if defined(BELLE_NAMESPACE)
 } // namespace Belle

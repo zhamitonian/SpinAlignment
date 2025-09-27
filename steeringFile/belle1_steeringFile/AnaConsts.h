@@ -10,7 +10,8 @@ using namespace std;
 namespace Belle {
 #endif
 
-    extern float xmass[5];
+    extern double xmass[5];
+    extern double PI;
 
     namespace cuts
     {
@@ -20,20 +21,6 @@ namespace Belle {
         extern const double minPhotonE;
         extern const int minNGoodTracks;
         extern const double minPt;
-    }
-
-    namespace kinematics
-    {
-        extern double ler_e;
-        extern double her_e;
-        extern HepLorentzVector firstElectronCM;
-        extern HepLorentzVector secondElectronCM;
-        extern Hep3Vector CMBoost;
-        extern HepLorentzVector cm;
-        extern double Q;
-        extern double thrust;
-        extern double thrust_theta;
-        extern double thrust_phi;
     }
 
 #if defined(BELLE_NAMESPACE)
