@@ -7,8 +7,9 @@
 #include "basf/module.h"
 #include "tables/evtcls.h"
 #include "basf/module_descr.h"
-#include "TFile.h"
-#include "TH1F.h"
+
+#include <TFile.h>
+#include <TH1F.h>
 #include <TTree.h>
 #include <TRandom.h>
 #include <TRandom2.h>
@@ -45,6 +46,8 @@ class SpinAlignment : public Module{
         void term();
         void getDrDz(Mdst_charged_Manager::iterator chr_it, int masshyp, double& dr, double& dz, double& refitPx, double& refitPy, double& refitPz);
         void other(int*, BelleEvent*, int*);
+        std::pair<double, double> calculateHeavyJetMassEnergy(const Vp4 &particles, const Hep3Vector &thrustAxis);
+        std::pair<double, double> calculateSphericityAplanarity(const std::vector<HepLorentzVector>& particles);
 
     public: // BASF parameter
         char* output_filename;
@@ -57,45 +60,65 @@ class SpinAlignment : public Module{
         TRandom3 r7;
         TRandom3 r8;
         TRandom3 r9;
-        double PI;
         TFile * output_file;
         TTree * tree;
         double ler_e;
         double her_e;
+        double x_angle;
 
         struct var_collection{
             int evtNo;
             int runNo;
             int expNo;
             double Q;
-            double visEnergy;
-            double Evis;
+            double e9oe25;
+            double Ecms;
+            double Evis_cms;
+            double BalancePz_cms;
+            double Energy_cms;
+            double ECLEnergyWO;
+            double ECLEnergy;
+            double HeavyJetMass;
+            double HeavyJetEnergy;
+            double sphericity;
+            double aplanarity;
             int nGood;
             int nPip;
             int nPim;
+            int nPhoton;
             int nCluster;
+            double z;
+            double pt;
+            double foxWolfram[5];
+            double thrust[3];
+            double cms_vecP[4];
+
+        } m_info;
+
+        struct KinematicsVars {
+            double ler_e;
+            double her_e;
+            double x_angle;
+            HepLorentzVector firstElectronCM;
+            HepLorentzVector secondElectronCM;
+            Hep3Vector CMBoost;
+            HepLorentzVector cm;
+            double Q;
             double thrust;
             double thrust_theta;
             double thrust_phi;
-            double z;
-            double pt;
-            double cms_vecP[4];
-        } m_info;
+        } kinematics;
 
-        int nPhoton;
-        int nCluster;
-        double photon_p[50];
-        double photon_theta[50];
-        double photon_phi[50];
+        Vdouble pho_p;
+        Vdouble pho_theta;
+        Vdouble pho_phi;
+        Vdouble cls_p;
+        Vdouble cls_theta;
+        Vdouble cls_phi;
+        Vdouble trk_p;
+        Vdouble trk_theta;
+        Vdouble trk_phi;
 
-        int nPip;
-        int nPim;
-        double pip_vecP[50][4];
-        double pim_vecP[50][4];
-        double pip_theta[50];
-        double pim_theta[50];
-        double pip_phi[50];
-        double pim_phi[50];
 };
 
 

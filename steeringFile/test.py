@@ -1,2 +1,0 @@
-from STEERING_TOOLS import BelleAnalysisBase
-pass
