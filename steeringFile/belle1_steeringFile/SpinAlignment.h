@@ -71,6 +71,7 @@ class SpinAlignment : public Module{
             int runNo;
             int expNo;
             double Q;
+            double e9oe25;
             double Ecms;
             double Evis_cms;
             double BalancePz_cms;
@@ -108,15 +109,15 @@ class SpinAlignment : public Module{
             double thrust_phi;
         } kinematics;
 
-        Vdouble photon_p;
-        Vdouble photon_theta;
-        Vdouble photon_phi;
-        Vdouble pip_p;
-        Vdouble pip_theta;
-        Vdouble pip_phi;
-        Vdouble pim_p;
-        Vdouble pim_theta;
-        Vdouble pim_phi;
+        Vdouble pho_p;
+        Vdouble pho_theta;
+        Vdouble pho_phi;
+        Vdouble cls_p;
+        Vdouble cls_theta;
+        Vdouble cls_phi;
+        Vdouble trk_p;
+        Vdouble trk_theta;
+        Vdouble trk_phi;
 
 };
 

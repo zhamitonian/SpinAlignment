@@ -31,7 +31,7 @@ if len(sys.argv) > 1:
     steering_tools.setup_IO(main)
 else:
     input_mdst = "/group/belle/bdata_b/dstprod/dat/e000069/HadronBJ/0127/continuum/08/HadronBJ-e000069r000823-b20090127_0910.mdst" 
-    output_root = "b2bii_test02.root"
+    output_root = "b2bii_test_thrust_cal.root"
     steering_tools.setup_IO(main, input_mdst, output_root)
     
 steering_tools.setup_common_aliases()
@@ -47,7 +47,6 @@ ma.fillParticleList('pi+:track', track_cut, path=main)
 # good cluster & photon
 cluster_cut = 'E > 0.1'
 photon_cut = 'E > 0.1  and thetaInCDCAcceptance'
-photon_cut = 'E > 0.1  and theta > 17.0 and theta < 150.0'
 #ma.fillParticleList('gamma:cluster', cluster_cut, path=main)
 #ma.fillParticleList('gamma:photon', photon_cut, path=main)
 ma.cutAndCopyList("gamma:photon", "gamma:mdst", photon_cut, path = main)
@@ -73,7 +72,9 @@ variables.addAlias('AverageVz', 'formula( averageValueInList(pi+:forvz, dz) )')
 # calculate event kinematics variables 
 ma.buildEventKinematics(['pi+:track', 'gamma:cluster'], path=main)
 
-ma.buildEventShape(['pi+:track', 'gamma:cluster'], path=main)
+#ma.buildEventShape(['pi+:track', 'gamma:cluster'], path=main)
+# test thrust calculation with charged tracks only
+ma.buildEventShape(['pi+:track'], path=main)
 
 variables.addAlias('HeavyJetMass', 'formula( max(forwardHemisphereMass, backwardHemisphereMass) )')
 variables.addAlias('HeavyJetE', 'conditionalVariableSelector(forwardHemisphereMass > backwardHemisphereMass, forwardHemisphereEnergy, backwardHemisphereEnergy)')
@@ -117,6 +118,7 @@ event_vars += ['sphericity', 'aplanarity', 'foxWolframR2']
 event_vars += ['thrust', 'thrustAxisCosTheta']
 #event_vars += ['visibleEnergyOfEventCMS', 'missingMomentumOfEventCMS_Pz']
 
+"""
 is_hadron  = ['Ecms', 'SkimHad']
 is_hadron += ['EvisCMS', 'BalancePzCMS', 'HeavyJetMass']
 is_hadron += ['ECLEnergyWO', 'AverageVz']
@@ -146,13 +148,27 @@ ma.variablesToNtuple('K*0:spin',
                      filename=steering_tools.output_file, 
                      treename='kstar', 
                      path=main)
+"""
 
-# Event-wise information for phi list in the event (common)
+kinematics = ['p', 'theta', 'phi']
+
 main.add_module('VariablesToEventBasedTree', 
                 fileName=steering_tools.output_file, 
                 particleList='pi+:track', 
-                treeName='event', 
-                event_variables=event_vars)
+                treeName='event_trk', 
+                event_variables=event_vars,
+                variables = kinematics)
+main.add_module('VariablesToEventBasedTree', 
+                fileName=steering_tools.output_file, 
+                particleList='gamma:cluster', 
+                treeName='event_cls', 
+                variables = kinematics)
+main.add_module('VariablesToEventBasedTree', 
+                fileName=steering_tools.output_file, 
+                particleList='gamma:photon', 
+                treeName='event_pho', 
+                variables = kinematics)
+
 
 b2.process(main)
 print(b2.statistics)

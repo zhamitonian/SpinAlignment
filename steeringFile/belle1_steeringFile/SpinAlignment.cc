@@ -114,6 +114,7 @@ void SpinAlignment::hist_def(){
     ADDBRANCH(runNo, I);
     ADDBRANCH(expNo, I);
     ADDBRANCH(Q, D);
+    ADDBRANCH(e9oe25, D);
     ADDBRANCH(Ecms, D);
     ADDBRANCH(Energy_cms, D);
     ADDBRANCH(Evis_cms, D);
@@ -136,15 +137,15 @@ void SpinAlignment::hist_def(){
     ADDBARRAY(thrust, 3, D);
 
     // vector<double> type branches
-    tree->Branch("photon_p", &photon_p);
-    tree->Branch("photon_theta", &photon_theta);
-    tree->Branch("photon_phi", &photon_phi);
-    tree->Branch("pip_p", &pip_p);
-    tree->Branch("pim_p", &pim_p);
-    tree->Branch("pip_theta", &pip_theta);
-    tree->Branch("pim_theta", &pim_theta);
-    tree->Branch("pip_phi", &pip_phi);
-    tree->Branch("pim_phi", &pim_phi);
+    tree->Branch("pho_p", &pho_p);
+    tree->Branch("pho_theta", &pho_theta);
+    tree->Branch("pho_phi", &pho_phi);
+    tree->Branch("cls_p", &cls_p);
+    tree->Branch("cls_theta", &cls_theta);
+    tree->Branch("cls_phi", &cls_phi);
+    tree->Branch("trk_p", &trk_p);
+    tree->Branch("trk_theta", &trk_theta);
+    tree->Branch("trk_phi", &trk_phi);
 
     return;
 }
@@ -170,20 +171,23 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
 
     Vp3 allParticles;
     Vp3 allParticles_Boosted;
+    Vp3 chrg_trk_Boosted;
     Vp4 Vp4s_Boosted;
     Vp4 Vp4s;
     allParticles.clear();
     allParticles_Boosted.clear();
-    photon_p.clear();
-    photon_theta.clear();
-    photon_phi.clear();
-    pip_p.clear();
-    pim_p.clear();
-    pip_theta.clear();
-    pim_theta.clear();
-    pip_phi.clear();
-    pim_phi.clear();
+    chrg_trk_Boosted.clear();
+    pho_p.clear();
+    pho_theta.clear();
+    pho_phi.clear();
+    cls_p.clear();
+    cls_theta.clear();
+    cls_phi.clear();
+    trk_p.clear();
+    trk_theta.clear();
+    trk_phi.clear();
 
+    double e9oe25 = 0;
     double Energy_cms = 0;
     double Evis_cms = 0;
     double ECLEnergyWO= 0;
@@ -234,21 +238,19 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
         if(charge == 1) {
             strcpy(particleName, "pi+");
             nPip ++;
-            pip_p.push_back(vec_p3.mag());
-            pip_theta.push_back(vec_p3.theta());
-            pip_phi.push_back(vec_p3.phi());
         }
         else if(charge == -1)  {
             strcpy(particleName, "pi-");
             nPim ++;
-            pim_p.push_back(vec_p3.mag());
-            pim_theta.push_back(vec_p3.theta());
-            pim_phi.push_back(vec_p3.phi());
             //pim_vecP.push_back({vec_p4.px(), vec_p4.py(), vec_p4.pz(), vec_p4.e()});
         }
+        trk_p.push_back(vec_p3.mag());
+        trk_theta.push_back(vec_p3.theta());
+        trk_phi.push_back(vec_p3.phi());
 
         allParticles.push_back(vec_p3);
         allParticles_Boosted.push_back(vec_p4_boosted.vect());
+        chrg_trk_Boosted.push_back(vec_p4_boosted.vect());
         Vp4s_Boosted.push_back(vec_p4_boosted);
         Vp4s.push_back(vec_p4);
 
@@ -269,18 +271,18 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
 
         Hep3Vector vec_p3(gamma.p(0), gamma.p(1), gamma.p(2));
 
-        //Mdst_ecl_aux &aux = eclaux_mgr(Panther_ID(gamma.ecl().get_ID()));
+        Mdst_ecl_aux &aux = eclaux_mgr(Panther_ID(gamma.ecl().get_ID()));
+        e9oe25 = aux.e9oe25();
 
-        //double e9oe25 = aux.e9oe25();
         double gammaE = vec_p3.mag();
         double ecl_E = ecl.energy();
-        photon_p.push_back(gammaE);
-        photon_theta.push_back(vec_p3.theta());
-        photon_phi.push_back(vec_p3.phi());
-        //cout << gammaE - ecl_E << endl;
         
         if(gammaE < cuts::minPhotonE) 
             continue;
+
+        cls_p.push_back(gammaE);
+        cls_theta.push_back(vec_p3.theta());
+        cls_phi.push_back(vec_p3.phi());
 
         double gam_theta = vec_p3.theta() * 180/ PI; 
         bool thetaInCDCAcceptance = false;
@@ -302,6 +304,9 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
             ECLEnergy += vec_p4.e();
             BalancePz_cms += vec_p4_boosted.pz();
             nPhoton ++;
+            pho_p.push_back(gammaE);
+            pho_theta.push_back(vec_p3.theta());
+            pho_phi.push_back(vec_p3.phi());
         }
         nCluster ++;
         allParticles.push_back(vec_p3);
@@ -313,7 +318,9 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
     if (nCluster - nPhoton > 1)
     cout << Evis_cms << " " << Energy_cms << " " << nPhoton << " "<< nCluster << endl;
 
-    Hep3Vector t_cms = thrust(allParticles_Boosted.begin(), allParticles_Boosted.end(), retSelf);
+    //Hep3Vector t_cms = thrust(allParticles_Boosted.begin(), allParticles_Boosted.end(), retSelf);
+    // test thrust calculation
+    Hep3Vector t_cms = thrust(chrg_trk_Boosted.begin(), chrg_trk_Boosted.end(), retSelf);
     Hep3Vector t = thrust(allParticles.begin(), allParticles.end(), retSelf);
     FoxWolfram fw = foxwolfram(allParticles_Boosted.begin(), allParticles_Boosted.end(), retSelf);
     FoxWolfram fw1 = foxwolfram(allParticles.begin(), allParticles.end(), retSelf);
@@ -348,6 +355,7 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
     m_info.Evis_cms = Evis_cms;
     m_info.BalancePz_cms = BalancePz_cms;
     m_info.Energy_cms = Energy_cms;
+    m_info.e9oe25 = e9oe25;
     m_info.ECLEnergy = ECLEnergy;
     m_info.ECLEnergyWO = ECLEnergyWO;
 
