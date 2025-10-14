@@ -86,9 +86,13 @@ void SpinAlignment::begin_run(BelleEvent* evptr, int* status){
     }
 
     kinematics.cm = HepLorentzVector(-kinematics.her_e * sin(kinematics.x_angle), 0., -kinematics.her_e * cos(kinematics.x_angle) + kinematics.ler_e, kinematics.her_e + kinematics.ler_e);
+
     kinematics.CMBoost = kinematics.cm.boostVector();
     kinematics.firstElectronCM = HepLorentzVector(kinematics.her_e * sin(kinematics.x_angle), 0., kinematics.her_e * cos(kinematics.x_angle), kinematics.her_e);
     kinematics.secondElectronCM = HepLorentzVector(0., 0., -kinematics.ler_e, kinematics.ler_e);
+
+    cout << kinematics.cm << endl;
+    cout << kinematics.CMBoost << endl;
 
     return;
 }
@@ -147,6 +151,15 @@ void SpinAlignment::hist_def(){
     tree->Branch("trk_theta", &trk_theta);
     tree->Branch("trk_phi", &trk_phi);
 
+    tree->Branch("pho_p_CMS", &pho_p_CMS);
+    tree->Branch("pho_theta_CMS", &pho_theta_CMS);
+    tree->Branch("pho_phi_CMS", &pho_phi_CMS);
+    tree->Branch("cls_p_CMS", &cls_p_CMS);
+    tree->Branch("cls_theta_CMS", &cls_theta_CMS);
+    tree->Branch("cls_phi_CMS", &cls_phi_CMS);
+    tree->Branch("trk_p_CMS", &trk_p_CMS);
+    tree->Branch("trk_theta_CMS", &trk_theta_CMS);
+    tree->Branch("trk_phi_CMS", &trk_phi_CMS);
     return;
 }
 
@@ -158,8 +171,8 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
     int  evtNo=Belle_event_Manager::get_manager().begin()->EvtNo();
     int  runNo=Belle_event_Manager::get_manager().begin()->RunNo();
 
-    if(!(countEvt%100)) 
-    cout << "evt " <<countEvt<< " expNo "<< expNo << ", runNo "<< runNo << ", evtNo "<< evtNo <<endl;
+    //if(!(countEvt%100)) 
+    //cout << "evt " <<countEvt<< " expNo "<< expNo << ", runNo "<< runNo << ", evtNo "<< evtNo <<endl;
 
     if(!IpProfile::usable()) {
         cout <<" ip not usable ..." << endl;
@@ -186,6 +199,15 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
     trk_p.clear();
     trk_theta.clear();
     trk_phi.clear();
+    pho_p_CMS.clear();
+    pho_theta_CMS.clear();
+    pho_phi_CMS.clear();
+    cls_p_CMS.clear();
+    cls_theta_CMS.clear();
+    cls_phi_CMS.clear();
+    trk_p_CMS.clear();
+    trk_theta_CMS.clear();
+    trk_phi_CMS.clear();
 
     double e9oe25 = 0;
     double Energy_cms = 0;
@@ -233,6 +255,7 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
         HepLorentzVector vec_p4(vec_p3, E);
         HepLorentzVector vec_p4_boosted(vec_p3, E);
         vec_p4_boosted.boost(kinematics.CMBoost);
+        Hep3Vector vec_p3_boosted = vec_p4_boosted.vect();
 
         int charge = chg.charge();
         if(charge == 1) {
@@ -247,6 +270,10 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
         trk_p.push_back(vec_p3.mag());
         trk_theta.push_back(vec_p3.theta());
         trk_phi.push_back(vec_p3.phi());
+
+        trk_p_CMS.push_back(vec_p3_boosted.mag());
+        trk_theta_CMS.push_back(vec_p3_boosted.theta());
+        trk_phi_CMS.push_back(vec_p3_boosted.phi());
 
         allParticles.push_back(vec_p3);
         allParticles_Boosted.push_back(vec_p4_boosted.vect());
@@ -280,9 +307,18 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
         if(gammaE < cuts::minPhotonE) 
             continue;
 
+        HepLorentzVector vec_p4(vec_p3, gammaE);
+        HepLorentzVector vec_p4_boosted(vec_p3, gammaE);
+        vec_p4_boosted.boost(kinematics.CMBoost);
+        Hep3Vector vec_p3_boosted = vec_p4_boosted.vect();
+
         cls_p.push_back(gammaE);
         cls_theta.push_back(vec_p3.theta());
         cls_phi.push_back(vec_p3.phi());
+
+        cls_p_CMS.push_back(vec_p3_boosted.mag());
+        cls_theta_CMS.push_back(vec_p3_boosted.theta());
+        cls_phi_CMS.push_back(vec_p3_boosted.phi());
 
         double gam_theta = vec_p3.theta() * 180/ PI; 
         bool thetaInCDCAcceptance = false;
@@ -293,9 +329,6 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
             cout << "a photon out of CDC acceptance with theta "<< gam_theta << endl;
         }
 
-        HepLorentzVector vec_p4(vec_p3, gammaE);
-        HepLorentzVector vec_p4_boosted(vec_p3, gammaE);
-        vec_p4_boosted.boost(kinematics.CMBoost);
 
         Energy_cms += vec_p4_boosted.e();
         ECLEnergyWO += vec_p4.e();
@@ -307,6 +340,10 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
             pho_p.push_back(gammaE);
             pho_theta.push_back(vec_p3.theta());
             pho_phi.push_back(vec_p3.phi());
+
+            pho_p_CMS.push_back(vec_p3_boosted.mag());
+            pho_theta_CMS.push_back(vec_p3_boosted.theta());
+            pho_phi_CMS.push_back(vec_p3_boosted.phi());
         }
         nCluster ++;
         allParticles.push_back(vec_p3);
@@ -318,9 +355,9 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
     if (nCluster - nPhoton > 1)
     cout << Evis_cms << " " << Energy_cms << " " << nPhoton << " "<< nCluster << endl;
 
-    //Hep3Vector t_cms = thrust(allParticles_Boosted.begin(), allParticles_Boosted.end(), retSelf);
+    Hep3Vector t_cms = thrust(allParticles_Boosted.begin(), allParticles_Boosted.end(), retSelf);
     // test thrust calculation
-    Hep3Vector t_cms = thrust(chrg_trk_Boosted.begin(), chrg_trk_Boosted.end(), retSelf);
+    // Hep3Vector t_cms = thrust(chrg_trk_Boosted.begin(), chrg_trk_Boosted.end(), retSelf);
     Hep3Vector t = thrust(allParticles.begin(), allParticles.end(), retSelf);
     FoxWolfram fw = foxwolfram(allParticles_Boosted.begin(), allParticles_Boosted.end(), retSelf);
     FoxWolfram fw1 = foxwolfram(allParticles.begin(), allParticles.end(), retSelf);
@@ -363,6 +400,8 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
     memcpy(m_info.foxWolfram, foxwolfram, sizeof(foxwolfram));
     double thrust_vec[3] = { t_cms.mag(), t_cms.z()/t_cms.mag(), t_cms.phi() };
     memcpy(m_info.thrust, thrust_vec, sizeof(thrust_vec));
+    cout << t_cms.z()/t_cms.mag() << " " << cos(t_cms.theta()) << endl;
+
     double cm_vec[4] = { kinematics.cm.px(), kinematics.cm.py(), kinematics.cm.pz(), kinematics.cm.e() };
     memcpy(m_info.cms_vecP, cm_vec, sizeof(cm_vec));
 
