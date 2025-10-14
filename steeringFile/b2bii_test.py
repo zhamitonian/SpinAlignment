@@ -31,8 +31,8 @@ if len(sys.argv) > 1:
     steering_tools.setup_environment()
     steering_tools.setup_IO(main)
 else:
-    #input_mdst = "/group/belle/bdata_b/dstprod/dat/e000069/HadronBJ/0127/continuum/08/HadronBJ-e000069r000823-b20090127_0910.mdst" 
-    input_mdst = "http://bweb3/mdst.php?ex=69&rs=823&re=823&skm=HadronBorJ&dt=continuum&bl=caseB"
+    input_mdst = "/group/belle/bdata_b/dstprod/dat/e000069/HadronBJ/0127/continuum/08/HadronBJ-e000069r000823-b20090127_0910.mdst" 
+    #input_mdst = "http://bweb3/mdst.php?ex=69&rs=823&re=823&skm=HadronBorJ&dt=continuum&bl=caseB"
     output_root = "b2bii_test.root"
     steering_tools.setup_IO(main, input_mdst, output_root)
 
@@ -48,24 +48,14 @@ ma.fillParticleList('pi+:track', track_cut, path=main)
 # good cluster & photon
 cluster_cut = 'E > 0.1'
 photon_cut = 'E > 0.1  and thetaInCDCAcceptance'
-#ma.fillParticleList('gamma:cluster', cluster_cut, path=main)
-#ma.fillParticleList('gamma:photon', photon_cut, path=main)
 ma.cutAndCopyList("gamma:photon", "gamma:mdst", photon_cut, path = main)
 ma.cutAndCopyList("gamma:cluster", "gamma:mdst", cluster_cut, path = main)
-
-print("Check gamma:mdst")
-ma.printVariableValues('gamma:mdst', 'M', path=main)
-print("Check gamma:cluster")
-ma.printVariableValues('gamma:photon', 'M', path=main)
-print("Check gamma:photon")
-ma.printVariableValues('gamma:photon', 'M', path=main)
 
 # Apply event based cuts
 nTrack_cut = "nCleanedTracks(" + track_cut + ") >= 3"
 ma.applyEventCuts(f"[{nTrack_cut}]", path=main)
 
 variables.addAlias('EnergyCMS', 'formula( useCMSFrame(totalEnergyOfParticlesInList(pi+:track)) + useCMSFrame(totalEnergyOfParticlesInList(gamma:cluster)) )')
-#variables.addAlias('EvisCMS', 'formula( useCMSFrame(sumValueInList(pi+:track, E)) + useCMSFrame(sumValueInList(gamma:photon, E)) )')
 variables.addAlias('EvisCMS', 'formula( useCMSFrame(totalEnergyOfParticlesInList(pi+:track)) + useCMSFrame(totalEnergyOfParticlesInList(gamma:photon)) )')
 
 variables.addAlias('BalancePzCMS', 'formula( useCMSFrame(totalPzOfParticlesInList(pi+:track))+ useCMSFrame(totalPzOfParticlesInList(gamma:photon)) )')
@@ -123,7 +113,6 @@ event_vars += ['HeavyJetMass', 'HeavyJetEnergy']
 event_vars += ['sphericity', 'aplanarity', 'foxWolframR2']
 event_vars += ['thrust', 'thrustAxisCosTheta']
 event_vars += ['beamPx', 'beamPy', 'beamPz', 'beamE']
-#event_vars += ['visibleEnergyOfEventCMS', 'missingMomentumOfEventCMS_Pz']
 
 """
 is_hadron  = ['Ecms', 'SkimHad']
