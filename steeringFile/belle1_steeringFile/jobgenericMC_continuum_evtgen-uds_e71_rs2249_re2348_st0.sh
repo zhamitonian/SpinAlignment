@@ -62,7 +62,8 @@ path add_condition main =<:0:KILL
 
 #data type: MC=1 for simulation,MC=0 for experiment.
 module put_parameter SpinAlignment  output_filename\./exp71_rs2249_re2348_evtgen-uds_0_tree.root
-module put_parameter SpinAlignment  output_filename\./test.root
+
+#module put_parameter SpinAlignment  output_filename\./test.root
 #module put_parameter SpinAlignment isMCSample\1
 #module put_parameter SpinAlignment rmMCTree\0
 ##mother particle: Y1S/Y2S/Y3S/Y4S/Y4Scon(40)/Y5S
