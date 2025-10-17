@@ -119,6 +119,42 @@ class SpinAlignment : public Module{
         Vdouble trk_theta;
         Vdouble trk_phi;
 
+        Vdouble pho_p_CMS;
+        Vdouble pho_theta_CMS;
+        Vdouble pho_phi_CMS;
+        Vdouble cls_p_CMS;
+        Vdouble cls_theta_CMS;
+        Vdouble cls_phi_CMS;
+        Vdouble trk_p_CMS;
+        Vdouble trk_theta_CMS;
+        Vdouble trk_phi_CMS;
+
+        Vdouble trk_E;
+        Vdouble trk_px;
+        Vdouble trk_py;
+        Vdouble trk_pz;
+        Vdouble trk_E_CMS;
+        Vdouble trk_px_CMS;
+        Vdouble trk_py_CMS;
+        Vdouble trk_pz_CMS;
+
+        Vdouble cls_E;
+        Vdouble cls_px;
+        Vdouble cls_py;
+        Vdouble cls_pz;
+        Vdouble cls_E_CMS;
+        Vdouble cls_px_CMS;
+        Vdouble cls_py_CMS;
+        Vdouble cls_pz_CMS;
+
+        Vdouble pho_E;
+        Vdouble pho_px;
+        Vdouble pho_py;
+        Vdouble pho_pz;
+        Vdouble pho_E_CMS;
+        Vdouble pho_px_CMS;
+        Vdouble pho_py_CMS;
+        Vdouble pho_pz_CMS;
 };
 
 

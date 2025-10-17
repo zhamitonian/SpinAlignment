@@ -156,9 +156,40 @@ void SpinAlignment::hist_def(){
     tree->Branch("cls_p_CMS", &cls_p_CMS);
     tree->Branch("cls_theta_CMS", &cls_theta_CMS);
     tree->Branch("cls_phi_CMS", &cls_phi_CMS);
-    tree->Branch("trk_p_CMS", &trk_p_CMS);
+    tree->Branch("pho_p_CMS", &trk_p_CMS);
     tree->Branch("trk_theta_CMS", &trk_theta_CMS);
     tree->Branch("trk_phi_CMS", &trk_phi_CMS);
+
+    tree->Branch("trk_E", &trk_E);
+    tree->Branch("trk_px", &trk_px);
+    tree->Branch("trk_py", &trk_py);
+    tree->Branch("trk_pz", &trk_pz);
+
+    tree->Branch("trk_E_CMS", &trk_E_CMS);
+    tree->Branch("trk_px_CMS", &trk_px_CMS);
+    tree->Branch("trk_py_CMS", &trk_py_CMS);
+    tree->Branch("trk_pz_CMS", &trk_pz_CMS);
+
+    tree->Branch("cls_E", &cls_E);
+    tree->Branch("cls_px", &cls_px);
+    tree->Branch("cls_py", &cls_py);
+    tree->Branch("cls_pz", &cls_pz);
+
+    tree->Branch("cls_E_CMS", &cls_E_CMS);
+    tree->Branch("cls_px_CMS", &cls_px_CMS);
+    tree->Branch("cls_py_CMS", &cls_py_CMS);
+    tree->Branch("cls_pz_CMS", &cls_pz_CMS);
+
+    tree->Branch("pho_E", &pho_E);
+    tree->Branch("pho_px", &pho_px);
+    tree->Branch("pho_py", &pho_py);
+    tree->Branch("pho_pz", &pho_pz);
+
+    tree->Branch("pho_E_CMS", &pho_E_CMS);
+    tree->Branch("pho_px_CMS", &pho_px_CMS);
+    tree->Branch("pho_py_CMS", &pho_py_CMS);
+    tree->Branch("pho_pz_CMS", &pho_pz_CMS);
+    
     return;
 }
 
@@ -172,7 +203,6 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
 
     //if(!(countEvt%100)) 
     //cout << "evt " <<countEvt<< " expNo "<< expNo << ", runNo "<< runNo << ", evtNo "<< evtNo <<endl;
-
     if(!IpProfile::usable()) {
         cout <<" ip not usable ..." << endl;
         return;
@@ -207,6 +237,30 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
     trk_p_CMS.clear();
     trk_theta_CMS.clear();
     trk_phi_CMS.clear();
+    trk_E.clear();
+    trk_px.clear();
+    trk_py.clear();
+    trk_pz.clear();
+    trk_E_CMS.clear();
+    trk_px_CMS.clear();
+    trk_py_CMS.clear();
+    trk_pz_CMS.clear();
+    pho_E.clear();
+    pho_px.clear();
+    pho_py.clear();
+    pho_pz.clear();
+    pho_E_CMS.clear();
+    pho_px_CMS.clear();
+    pho_py_CMS.clear();
+    pho_pz_CMS.clear();
+    cls_E.clear();
+    cls_px.clear();
+    cls_py.clear();
+    cls_pz.clear();
+    cls_E_CMS.clear();
+    cls_px_CMS.clear();
+    cls_py_CMS.clear();
+    cls_pz_CMS.clear();
 
     double e9oe25 = 0;
     double Energy_cms = 0;
@@ -269,10 +323,19 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
         trk_p.push_back(vec_p3.mag());
         trk_theta.push_back(vec_p3.theta());
         trk_phi.push_back(vec_p3.phi());
+        trk_E.push_back(E);
+        trk_px.push_back(vec_p4.px());
+        trk_py.push_back(vec_p4.py());
+        trk_pz.push_back(vec_p4.pz());
 
         trk_p_CMS.push_back(vec_p3_boosted.mag());
         trk_theta_CMS.push_back(vec_p3_boosted.theta());
         trk_phi_CMS.push_back(vec_p3_boosted.phi());
+
+        trk_E_CMS.push_back(vec_p4_boosted.e());
+        trk_px_CMS.push_back(vec_p4_boosted.px());
+        trk_py_CMS.push_back(vec_p4_boosted.py());
+        trk_pz_CMS.push_back(vec_p4_boosted.pz());
 
         allParticles.push_back(vec_p3);
         allParticles_Boosted.push_back(vec_p4_boosted.vect());
@@ -319,6 +382,16 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
         cls_theta_CMS.push_back(vec_p3_boosted.theta());
         cls_phi_CMS.push_back(vec_p3_boosted.phi());
 
+        cls_E.push_back(gammaE);
+        cls_px.push_back(vec_p4.px());
+        cls_py.push_back(vec_p4.py());
+        cls_pz.push_back(vec_p4.pz());
+
+        cls_E_CMS.push_back(vec_p4_boosted.e());
+        cls_px_CMS.push_back(vec_p4_boosted.px());
+        cls_py_CMS.push_back(vec_p4_boosted.py());
+        cls_pz_CMS.push_back(vec_p4_boosted.pz());
+
         double gam_theta = vec_p3.theta() * 180/ PI; 
         bool thetaInCDCAcceptance = false;
         if(gam_theta > 17.0  && gam_theta < 150.0 ){
@@ -343,6 +416,17 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
             pho_p_CMS.push_back(vec_p3_boosted.mag());
             pho_theta_CMS.push_back(vec_p3_boosted.theta());
             pho_phi_CMS.push_back(vec_p3_boosted.phi());
+
+            pho_E.push_back(gammaE);
+            pho_px.push_back(vec_p4.px());
+            pho_py.push_back(vec_p4.py());
+            pho_pz.push_back(vec_p4.pz());
+
+            pho_E_CMS.push_back(vec_p4_boosted.e());
+            pho_px_CMS.push_back(vec_p4_boosted.px());
+            pho_py_CMS.push_back(vec_p4_boosted.py());
+            pho_pz_CMS.push_back(vec_p4_boosted.pz());
+
         }
         nCluster ++;
         allParticles.push_back(vec_p3);
