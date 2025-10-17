@@ -146,7 +146,8 @@ ma.variablesToNtuple('K*0:spin',
                      path=main)
 """
 
-kinematics = ['p', 'theta', 'phi', 'p_CMS', 'theta_CMS', 'phi_CMS']
+kinematics = ['p', 'theta', 'phi', 'p_CMS', 'theta_CMS', 'phi_CMS',
+              'E', 'px', 'py', 'pz', 'E_CMS', 'px_CMS', 'py_CMS', 'pz_CMS']
 
 main.add_module('VariablesToEventBasedTree', 
                 fileName=steering_tools.output_file, 
