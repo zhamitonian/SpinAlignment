@@ -41,8 +41,8 @@ using namespace std;
 qqbar(udsc) -> phi+ + anything                             
          \-> K+ K-                                 
 
-version : v1.X.X
-Date    : 2025.11.XX
+version : v2.0.0
+Date    : 2025.11.25
 Author  : Zhen Wang
 */
 
@@ -78,8 +78,6 @@ void SpinAlignment::init(int *status){
     *status=0;
     return;
 }
-
-
 
 void SpinAlignment::begin_run(BelleEvent* evptr, int* status){
     // loading calibration constants and lookup tables needed for particle ID ?
@@ -126,11 +124,6 @@ void SpinAlignment::hist_def(){
     #define ADDBARRAY__(name, var, n, type) ADDBRANCH__(name, var, name[n]/type)
     #define ADDBARRAY(x, n, type)          ADDBARRAY__(x, x, n, type)
 
-    #define ADDMCBRANCH__(name, var, type)   mctree->Branch(#name, &m_mc_info.var, #type)
-    #define ADDMCBARRAY__(name,var,n,type) ADDMCBRANCH__(name,var,name[n]/type)
-    #define ADDMCBRANCH(x,type)            ADDMCBRANCH__(x,x,x/type)
-    #define ADDMCBARRAY(x,n,type)          ADDMCBARRAY__(x,x,n,type)
-
     ADDBRANCH(evtNo, I);
     ADDBRANCH(runNo, I);
     ADDBRANCH(expNo, I);
@@ -139,12 +132,12 @@ void SpinAlignment::hist_def(){
     ADDBRANCH(PrimeVr, D);
     ADDBRANCH(PrimeVz, D);
 
-    ADDBRANCH(HeavyJetMass, D);
-    ADDBRANCH(HeavyJetEnergy, D);
-    ADDBRANCH(sphericity, D);
-    ADDBRANCH(aplanarity, D);
-    ADDBRANCH(nGood, I);
-    ADDBARRAY(foxWolfram, 5, D);
+    //ADDBRANCH(HeavyJetMass, D);
+    //ADDBRANCH(HeavyJetEnergy, D);
+    //ADDBRANCH(sphericity, D);
+    //ADDBRANCH(aplanarity, D);
+    //ADDBRANCH(nGood, I);
+    //ADDBARRAY(foxWolfram, 5, D);
     ADDBARRAY(thrust, 3, D);
 
     if (isMC){
@@ -157,8 +150,8 @@ void SpinAlignment::hist_def(){
         mctree->Branch("km_py_cms_truth", &km_py_cms_truth);
         mctree->Branch("km_pz_cms_truth", &km_pz_cms_truth);
 
-        //ADDMCBARRAY(thrust_truth, 3, D);
         mctree->Branch("thrust_truth", &thrust_truth);
+        mctree->Branch("qqbar_axis", &qqbar_axis);
     }
 
     // vector<double> type branches
@@ -187,6 +180,7 @@ void SpinAlignment::hist_def(){
         tree->Branch("n_phi_truth", &n_phi_truth);
 
         tree->Branch("thrust_truth", &thrust_truth);
+        tree->Branch("qqbar_axis", &qqbar_axis);
     }
     return;
 }
@@ -201,6 +195,7 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
 
     if (isMC == 1){
         thrust_truth.clear();
+        qqbar_axis.clear();
         readMC();
     }
 
@@ -216,14 +211,12 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
     Mdst_gamma_Manager& gamma_mgr = Mdst_gamma_Manager::get_manager();
 
     //---------------------------------------------------------
-    // calculate hadonic event manually
     Vp3 particles_p3_cms;
     Vp4 particles_p4_cms;
     particles_p3_cms.clear();
     particles_p4_cms.clear();
-    double Evis_cms = 0;
-    double heavyJetMass = 0;
 
+    // track primary vertex fit
     kvertexfitter kv;
     HepPoint3D ip = IpProfile::position(1); // 1 for event-dependent IP
     HepSymMatrix errIp = IpProfile::position_err(1);
@@ -234,6 +227,7 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
         const Mdst_charged &chg = *ch_it;
         Hep3Vector vec_p3(chg.p(0), chg.p(1), chg.p(2));
 
+        /*
         double dr, dz, refitPx, refitPy, refitPz;
         getDrDz(ch_it, 0, dr, dz, refitPx, refitPy, refitPz);
 
@@ -242,63 +236,17 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
         double pt = vec_p3.perp();
         if (pt < 0.1) 
             continue;
+        */
+        double E = sqrt(vec_p3.mag2() + xmass[2]*xmass[2]);  // pion mass hypothesis 
+        if (E < 0.1) 
+            continue;
 
-        // particle identification
-        bool isLepton = false;
-        int charge = chg.charge();
-        int massHyp = 2;
-
-        eid sel_e(*ch_it);  
-        atc_pid selKPi(3,1,5,3,2);  //K/pi separation
-        atc_pid selPiP(3,1,5,2,4); 
-        atc_pid selKP(3,1,5,3,4);
-        double mu_id = 0;
-        Muid_mdst muID(*ch_it);
-        if (muID.Chi_2() >0) 
-            mu_id = muID.Muon_likelihood();
-
-        double atcKPi=selKPi.prob(*ch_it);
-        double atcKP=selKP.prob(*ch_it);
-        double atcPiP=selPiP.prob(*ch_it);
-
-        float e_cut=0.85;
-        float mu_cut=0.9;
-        double e_id=sel_e.prob(3,-1,5);
-
-        if(mu_id > mu_cut) {
-            massHyp = 1; // muon
-            isLepton = true;
-        }
-        else if(e_id > e_cut && mu_id < mu_cut) {
-            massHyp = 0; // electron
-            isLepton = true;
-        }
-
-        if(!isLepton) {
-            if(atcKPi > 0.6 && atcKP > 0.2) {
-                massHyp = 3; // kaon
-            }
-            else if(atcKPi < 0.6 && atcPiP > 0.2) {
-                massHyp = 2; // pion
-            }
-            else if(atcKP < 0.2 && atcPiP < 0.2) {
-                massHyp = 4; // proton
-            }
-        }
-
-        //double E = sqrt(vec_p3.mag2() + xmass[2]*xmass[2]);  // pion mass hypothesis 
-        double E = sqrt(vec_p3.mag2() + xmass[massHyp]*xmass[massHyp]);  // pion mass hypothesis 
-        
         HepLorentzVector vec_p4_cms(vec_p3, E);
         vec_p4_cms.boost(kinematics.CMBoost);
         particles_p3_cms.push_back(vec_p4_cms.vect());
         particles_p4_cms.push_back(vec_p4_cms);
 
-        Evis_cms += vec_p4_cms.vect().mag();
     }
-
-    if (particles_p3_cms.size() < 3) 
-        return;
 
     for(Mdst_gamma_Manager::iterator gam = gamma_mgr.begin(); gam != gamma_mgr.end(); gam++){
         const Mdst_gamma &gamma = *gam;
@@ -309,9 +257,10 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
         //        =0: not match; -1:shower-trk; -2: charged-trk;
         // quality: ECL data quality. in gsim, =0:good cluster.
         //if(ecl.match() != 0 || ecl.quality() != 0)
+        /*
         if(ecl.match() != 0)
             continue;
-        
+        */
         Hep3Vector vec_p3(gamma.p(0), gamma.p(1), gamma.p(2));
         double gammaE = vec_p3.mag();
         
@@ -322,30 +271,23 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
         vec_p4_cms.boost(kinematics.CMBoost);
         particles_p3_cms.push_back(vec_p4_cms.vect());
         particles_p4_cms.push_back(vec_p4_cms);
-
-        Evis_cms += vec_p4_cms.e();
     }
 
     Hep3Vector thrust_cms = thrust(particles_p3_cms.begin(), particles_p3_cms.end(), retSelf);
-    std::pair<double, double> jetMassEnergy = calculateHeavyJetMassEnergy(particles_p4_cms, thrust_cms.unit());
-    heavyJetMass = jetMassEnergy.first;
-
 
     //---------------------------------------------------------
     // Additional hadron event selection (for HadronB skimed data)
 
     Evtcls_hadron_info_Manager& hadronInfo_mgr = Evtcls_hadron_info_Manager::get_manager();
-    double Evis_cms_new = hadronInfo_mgr.begin()->Evis();
-    double heavyJetMass_new = hadronInfo_mgr.begin()->HeavyJetMass();
-
-    cout << "Evis_cms: " << Evis_cms << " Evis_cms_new: " << Evis_cms_new << endl;
-    //cout << "heavyJetMass: " << heavyJetMass << " heavyJetMass_new: " << heavyJetMass_new << endl;
-
-    // additional hadron event selection cuts
-    //if (Evis_cms <= cuts::Evis_cms) 
-    //    return;
-    //if (heavyJetMass <= cuts::HJM_min && heavyJetMass <= cuts::HJM_Evis_ratio*Evis_cms) 
-    //    return;
+    double Evis_cms = hadronInfo_mgr.begin()->Evis();
+    double Ntrk = hadronInfo_mgr.begin()->Ntrk();
+    double heavyJetMass = hadronInfo_mgr.begin()->HeavyJetMass();
+    if (Evis_cms < cuts::Evis_cms) 
+        return;
+    if (Ntrk < 3){
+        //cout << "Warning: Ntrk = " << Ntrk << endl;
+        return;
+    }
 
     //---------------------------------------------------------
     // start our selection
@@ -508,18 +450,15 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
 
     }
 
-    if (hadrons_p3_cms.size() < 3) return;
-
     // ensure there has at least a K+ K- pair
     if (kp_px_cms.size() * km_px_cms.size() ==0) return;  
     
     m_info.evtNo = evtNo;
     m_info.runNo = runNo;
     m_info.expNo = expNo;
-
     m_info.sqrts = kinematics.cm.m();
-    //double thrust_vec[3] = { thrust_cms.mag(), thrust_cms.z()/thrust_cms.mag(), thrust_cms.phi() };
-    //memcpy(m_info.thrust, thrust_vec, sizeof(thrust_vec));
+    double thrust_vec[3] = { thrust_cms.mag(), thrust_cms.z()/thrust_cms.mag(), thrust_cms.phi() };
+    memcpy(m_info.thrust, thrust_vec, sizeof(thrust_vec));
 
     tree->Fill();
 
@@ -541,19 +480,25 @@ void SpinAlignment::readMC()
     km_py_cms_truth.clear();
     km_pz_cms_truth.clear();
 
+    int Nquark = 0;
+    HepLorentzVector q_momentum(0.,0.,0.,0.);
+
     Gen_hepevt_Manager& gen_hep_Mgr = Gen_hepevt_Manager::get_manager();
 
     for(Gen_hepevt_Manager::iterator gen_it = gen_hep_Mgr.begin(); gen_it != gen_hep_Mgr.end(); ++gen_it) {
-
         int pid = gen_it->idhep();
-
+        int status = gen_it->isthep();
+        
         // for daughter particle retrieval
         Gen_hepevt_Manager& gen_hepevt_mgr = Gen_hepevt_Manager::get_manager();
 
         if (pid == 333)
         {
             int ndaug = (gen_it->daLast() - gen_it->daFirst()) + 1;
-            if (ndaug != 2) continue; // phi -> K+ K- only
+            //if (ndaug != 2) continue; // phi -> K+ K- only
+            if (ndaug != 2){
+                cout << "Warning: phi meson decay daughters number is " << ndaug << endl;
+            }
 
             for (int i = 0; i < ndaug; ++i){
                 Panther_ID ID(gen_it->daFirst() + i);
@@ -583,26 +528,28 @@ void SpinAlignment::readMC()
         HepLorentzVector v4tmp (gen_it->PX(),gen_it->PY(),gen_it->PZ(),gen_it->E()); 
         v4tmp.boost(kinematics.CMBoost);
 
-        bool isleaf = false;
-        for (int ii = 0; ii < 7; ii++){
-            if(abs(pid) == leafParticleID[ii]) 
-                isleaf = true;
-            if(gen_it->mother() && abs(gen_it->mother().idhep()) == leafParticleID[ii]) 
-            // not counter neutron's daughter, because we have counted neutron as leaf particle
-                isleaf = false;
+        if (status == 1) {  // stable final state particles
+            if (abs(pid) == 12 || abs(pid) == 14 || abs(pid) == 16) // exclude neutrinos
+                continue;
+
+            //if (pid == 130) // K_L0
+            //    continue;
+
+            if (gen_it->E() > 0.1) { // same cut as in reconstructed level
+                allParticlesCMS_truth.push_back(v4tmp.vect());
+           }
         }
-        if (isleaf){
-            allParticlesCMS_truth.push_back(v4tmp.vect());
+
+        if (abs(pid) == 1 || abs(pid) == 2 || abs(pid) == 3 || abs(pid) == 4) {
+            Nquark++;
+            if(Nquark == 1){ // primary quark would in first 
+                q_momentum = v4tmp;
+            }
+            //int particle_index = std::distance(gen_hep_Mgr.begin(), gen_it);
         }
+        
     }
-
-    n_phi_truth = kp_E_cms_truth.size();
-
-    //if (n_phi_truth > 1) 
-    //    cout << "Warning: there are " << n_phi_truth << " phis in this event." << endl;
-    if (n_phi_truth < 1) return; // only one phi per event
     
-
     Hep3Vector t_truth = thrust(allParticlesCMS_truth.begin(), allParticlesCMS_truth.end(), retSelf);
 
     double thrust_vec[3] = { t_truth.mag(), t_truth.z()/t_truth.mag(), t_truth.phi() };
@@ -610,11 +557,22 @@ void SpinAlignment::readMC()
         thrust_truth.push_back(thrust_vec[i]);
     }
 
+    // qqbar axis
+    double qqbar_vec[2] = { 
+        q_momentum.z() / q_momentum.vect().mag(), 
+        q_momentum.phi() 
+    };
+    for(int i=0; i<2; i++){
+        qqbar_axis.push_back(qqbar_vec[i]);
+    }
+
+    n_phi_truth = kp_E_cms_truth.size();
+    if (n_phi_truth < 1) return; // ensure there is at least a phi meson in truth level
+
     mctree->Fill();
 
     return;
 }
-
 
 
 void SpinAlignment::disp_stat(const char*){
@@ -627,7 +585,6 @@ void SpinAlignment::term(){
     output_file->Close();
     return;
 }
-
 
 
 std::pair<double, double> SpinAlignment::calculateHeavyJetMassEnergy(const Vp4& particles, const Hep3Vector& thrustAxis) {
