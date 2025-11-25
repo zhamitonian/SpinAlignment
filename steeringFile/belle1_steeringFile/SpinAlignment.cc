@@ -36,6 +36,16 @@
 
 using namespace std;
 
+/*
+-----------------------------------------
+qqbar(udsc) -> phi+ + anything                             
+         \-> K+ K-                                 
+
+version : v1.X.X
+Date    : 2025.11.XX
+Author  : Zhen Wang
+*/
+
 #if defined(BELLE_NAMESPACE)
 namespace Belle {
 #endif
@@ -56,9 +66,11 @@ SpinAlignment::SpinAlignment(){
     r8.SetSeed(800);
     r9.SetSeed(900);
 
+    //#isMC = Belle_event_Manager::get_manager().begin()->MCFlag();
+    isMC = true;
+
     return;
 }
-
 
 void SpinAlignment::init(int *status){
     cout << "in SpinAlignment::init()" << endl;
@@ -66,6 +78,7 @@ void SpinAlignment::init(int *status){
     *status=0;
     return;
 }
+
 
 
 void SpinAlignment::begin_run(BelleEvent* evptr, int* status){
@@ -89,6 +102,8 @@ void SpinAlignment::begin_run(BelleEvent* evptr, int* status){
     kinematics.CMBoost = kinematics.cm.boostVector();
     kinematics.firstElectronCM = HepLorentzVector(kinematics.her_e * sin(kinematics.x_angle), 0., kinematics.her_e * cos(kinematics.x_angle), kinematics.her_e);
     kinematics.secondElectronCM = HepLorentzVector(0., 0., -kinematics.ler_e, kinematics.ler_e);
+    kinematics.sqrts = kinematics.cm.m();
+
 
     return;
 }
@@ -102,51 +117,77 @@ void SpinAlignment::end_run(BelleEvent* evptr, int* status){
 
 void SpinAlignment::hist_def(){
     output_file = new TFile(output_filename, "RECREATE");
-    tree = new TTree("event", "event");
-
-    // macro to add branches
-    #define ADDBRANCH__(name, var, type)   tree->Branch(#name, &m_info.var, #type)
-    #define ADDBRANCH(x, type)            ADDBRANCH__(x, x, x/type)
+    tree = new TTree("event", "event"); 
+    mctree = new TTree("truth", "truth");
+                                        
+    // macro to add branches            
+    #define ADDBRANCH__(name, var, type );   tree->Branch(#name, &m_info.var, #type)
+    #define ADDBRANCH(x, type)             ADDBRANCH__(x, x, x/type)
     #define ADDBARRAY__(name, var, n, type) ADDBRANCH__(name, var, name[n]/type)
     #define ADDBARRAY(x, n, type)          ADDBARRAY__(x, x, n, type)
+
+    #define ADDMCBRANCH__(name, var, type)   mctree->Branch(#name, &m_mc_info.var, #type)
+    #define ADDMCBARRAY__(name,var,n,type) ADDMCBRANCH__(name,var,name[n]/type)
+    #define ADDMCBRANCH(x,type)            ADDMCBRANCH__(x,x,x/type)
+    #define ADDMCBARRAY(x,n,type)          ADDMCBARRAY__(x,x,n,type)
 
     ADDBRANCH(evtNo, I);
     ADDBRANCH(runNo, I);
     ADDBRANCH(expNo, I);
-    ADDBRANCH(Q, D);
-    ADDBRANCH(e9oe25, D);
-    ADDBRANCH(Ecms, D);
-    ADDBRANCH(Energy_cms, D);
     ADDBRANCH(Evis_cms, D);
-    ADDBRANCH(ECLEnergyWO, D);
-    ADDBRANCH(ECLEnergy, D);
-    ADDBRANCH(BalancePz_cms, D);
+    ADDBRANCH(sqrts, D);
+    ADDBRANCH(PrimeVr, D);
+    ADDBRANCH(PrimeVz, D);
+
     ADDBRANCH(HeavyJetMass, D);
     ADDBRANCH(HeavyJetEnergy, D);
     ADDBRANCH(sphericity, D);
     ADDBRANCH(aplanarity, D);
     ADDBRANCH(nGood, I);
-    ADDBRANCH(nPip, I);
-    ADDBRANCH(nPim, I);
-    ADDBRANCH(nCluster, I);
-    ADDBRANCH(nPhoton, I);
-    ADDBRANCH(z, D);
-    ADDBRANCH(pt, D);
     ADDBARRAY(foxWolfram, 5, D);
-    ADDBARRAY(cms_vecP, 4, D);
     ADDBARRAY(thrust, 3, D);
 
-    // vector<double> type branches
-    tree->Branch("pho_p", &pho_p);
-    tree->Branch("pho_theta", &pho_theta);
-    tree->Branch("pho_phi", &pho_phi);
-    tree->Branch("cls_p", &cls_p);
-    tree->Branch("cls_theta", &cls_theta);
-    tree->Branch("cls_phi", &cls_phi);
-    tree->Branch("trk_p", &trk_p);
-    tree->Branch("trk_theta", &trk_theta);
-    tree->Branch("trk_phi", &trk_phi);
+    if (isMC){
+        mctree->Branch("kp_E_cms_truth", &kp_E_cms_truth);
+        mctree->Branch("kp_px_cms_truth", &kp_px_cms_truth);
+        mctree->Branch("kp_py_cms_truth", &kp_py_cms_truth);
+        mctree->Branch("kp_pz_cms_truth", &kp_pz_cms_truth);
+        mctree->Branch("km_E_cms_truth", &km_E_cms_truth);
+        mctree->Branch("km_px_cms_truth", &km_px_cms_truth);
+        mctree->Branch("km_py_cms_truth", &km_py_cms_truth);
+        mctree->Branch("km_pz_cms_truth", &km_pz_cms_truth);
 
+        //ADDMCBARRAY(thrust_truth, 3, D);
+        mctree->Branch("thrust_truth", &thrust_truth);
+    }
+
+    // vector<double> type branches
+    tree->Branch("kp_E_cms", &kp_E_cms);
+    tree->Branch("kp_px_cms", &kp_px_cms);
+    tree->Branch("kp_py_cms", &kp_py_cms);
+    tree->Branch("kp_pz_cms", &kp_pz_cms);
+    tree->Branch("km_E_cms", &km_E_cms);
+    tree->Branch("km_px_cms", &km_px_cms);
+    tree->Branch("km_py_cms", &km_py_cms);
+    tree->Branch("km_pz_cms", &km_pz_cms);
+
+    if(isMC){
+        tree->Branch("kp_E_cms_gen", &kp_E_cms_gen);
+        tree->Branch("kp_px_cms_gen", &kp_px_cms_gen);
+        tree->Branch("kp_py_cms_gen", &kp_py_cms_gen);
+        tree->Branch("kp_pz_cms_gen", &kp_pz_cms_gen);
+        tree->Branch("km_E_cms_gen", &km_E_cms_gen);
+        tree->Branch("km_px_cms_gen", &km_px_cms_gen);
+        tree->Branch("km_py_cms_gen", &km_py_cms_gen);
+        tree->Branch("km_pz_cms_gen", &km_pz_cms_gen);
+
+        tree->Branch("kp_isSignal", &kp_isSignal);
+        tree->Branch("km_isSignal", &km_isSignal);
+
+        tree->Branch("n_phi_truth", &n_phi_truth);
+
+        tree->Branch("thrust_truth", &thrust_truth);
+    }
     return;
 }
 
@@ -158,218 +199,422 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
     int  evtNo=Belle_event_Manager::get_manager().begin()->EvtNo();
     int  runNo=Belle_event_Manager::get_manager().begin()->RunNo();
 
-    if(!(countEvt%100)) 
-    cout << "evt " <<countEvt<< " expNo "<< expNo << ", runNo "<< runNo << ", evtNo "<< evtNo <<endl;
+    if (isMC == 1){
+        thrust_truth.clear();
+        readMC();
+    }
 
+    if(!(countEvt%10000)) 
+    cout << "evt " <<countEvt<< " expNo "<< expNo << ", runNo "<< runNo << ", evtNo "<< evtNo <<endl;
     if(!IpProfile::usable()) {
         cout <<" ip not usable ..." << endl;
         return;
     }
-    const HepPoint3D ip_position = IpProfile::e_position();
-    const HepSymMatrix ip_osition_err = IpProfile::e_position_err();
     countEvt ++;
 
-    Vp3 allParticles;
-    Vp3 allParticles_Boosted;
-    Vp3 chrg_trk_Boosted;
-    Vp4 Vp4s_Boosted;
-    Vp4 Vp4s;
-    allParticles.clear();
-    allParticles_Boosted.clear();
-    chrg_trk_Boosted.clear();
-    pho_p.clear();
-    pho_theta.clear();
-    pho_phi.clear();
-    cls_p.clear();
-    cls_theta.clear();
-    cls_phi.clear();
-    trk_p.clear();
-    trk_theta.clear();
-    trk_phi.clear();
-
-    double e9oe25 = 0;
-    double Energy_cms = 0;
-    double Evis_cms = 0;
-    double ECLEnergyWO= 0;
-    double ECLEnergy = 0;
-    double BalancePz_cms = 0;
-    double heavyJetMass = 0;
-    double heavyJetEnergy = 0;
-    double sphericity = 0;
-    double aplanarity = 0;
-    int nPhoton = 0;
-    int nCluster= 0;
-    int nPip = 0;
-    int nPim = 0;
-
     Mdst_charged_Manager& charged_mgr = Mdst_charged_Manager::get_manager();
-    //Mdst_trk_Manager& trk_mgr = Mdst_trk_Manager::get_manager();  not used
     Mdst_gamma_Manager& gamma_mgr = Mdst_gamma_Manager::get_manager();
-    Mdst_ecl_aux_Manager& eclaux_mgr = Mdst_ecl_aux_Manager::get_manager();
 
-    char particleName[10];
-    strcpy(particleName, "unknown");
+    //---------------------------------------------------------
+    // calculate hadonic event manually
+    Vp3 particles_p3_cms;
+    Vp4 particles_p4_cms;
+    particles_p3_cms.clear();
+    particles_p4_cms.clear();
+    double Evis_cms = 0;
+    double heavyJetMass = 0;
+
+    kvertexfitter kv;
+    HepPoint3D ip = IpProfile::position(1); // 1 for event-dependent IP
+    HepSymMatrix errIp = IpProfile::position_err(1);
+    kv.initialVertex(ip);
+    kv.vertexProfile(errIp);
 
     for(Mdst_charged_Manager::iterator ch_it=charged_mgr.begin(); ch_it!=charged_mgr.end(); ch_it++){
         const Mdst_charged &chg = *ch_it;
-        //const Mdst_ecl &ecl= chg.ecl();
+        Hep3Vector vec_p3(chg.p(0), chg.p(1), chg.p(2));
 
-        int trkID = (*ch_it).get_ID();
+        double dr, dz, refitPx, refitPy, refitPz;
+        getDrDz(ch_it, 0, dr, dz, refitPx, refitPy, refitPz);
+
+        if(fabs(dr) >= 2 || fabs(dz) >= 4) 
+            continue;
+        double pt = vec_p3.perp();
+        if (pt < 0.1) 
+            continue;
+
+        // particle identification
+        bool isLepton = false;
+        int charge = chg.charge();
+        int massHyp = 2;
+
+        eid sel_e(*ch_it);  
+        atc_pid selKPi(3,1,5,3,2);  //K/pi separation
+        atc_pid selPiP(3,1,5,2,4); 
+        atc_pid selKP(3,1,5,3,4);
+        double mu_id = 0;
+        Muid_mdst muID(*ch_it);
+        if (muID.Chi_2() >0) 
+            mu_id = muID.Muon_likelihood();
+
+        double atcKPi=selKPi.prob(*ch_it);
+        double atcKP=selKP.prob(*ch_it);
+        double atcPiP=selPiP.prob(*ch_it);
+
+        float e_cut=0.85;
+        float mu_cut=0.9;
+        double e_id=sel_e.prob(3,-1,5);
+
+        if(mu_id > mu_cut) {
+            massHyp = 1; // muon
+            isLepton = true;
+        }
+        else if(e_id > e_cut && mu_id < mu_cut) {
+            massHyp = 0; // electron
+            isLepton = true;
+        }
+
+        if(!isLepton) {
+            if(atcKPi > 0.6 && atcKP > 0.2) {
+                massHyp = 3; // kaon
+            }
+            else if(atcKPi < 0.6 && atcPiP > 0.2) {
+                massHyp = 2; // pion
+            }
+            else if(atcKP < 0.2 && atcPiP < 0.2) {
+                massHyp = 4; // proton
+            }
+        }
+
+        //double E = sqrt(vec_p3.mag2() + xmass[2]*xmass[2]);  // pion mass hypothesis 
+        double E = sqrt(vec_p3.mag2() + xmass[massHyp]*xmass[massHyp]);  // pion mass hypothesis 
+        
+        HepLorentzVector vec_p4_cms(vec_p3, E);
+        vec_p4_cms.boost(kinematics.CMBoost);
+        particles_p3_cms.push_back(vec_p4_cms.vect());
+        particles_p4_cms.push_back(vec_p4_cms);
+
+        Evis_cms += vec_p4_cms.vect().mag();
+    }
+
+    if (particles_p3_cms.size() < 3) 
+        return;
+
+    for(Mdst_gamma_Manager::iterator gam = gamma_mgr.begin(); gam != gamma_mgr.end(); gam++){
+        const Mdst_gamma &gamma = *gam;
+        Mdst_ecl &ecl = gamma.ecl();
+
+        // Here we check the unassociated track and their quality
+        // match: the cluster matched with charged tracks in CDC
+        //        =0: not match; -1:shower-trk; -2: charged-trk;
+        // quality: ECL data quality. in gsim, =0:good cluster.
+        //if(ecl.match() != 0 || ecl.quality() != 0)
+        if(ecl.match() != 0)
+            continue;
+        
+        Hep3Vector vec_p3(gamma.p(0), gamma.p(1), gamma.p(2));
+        double gammaE = vec_p3.mag();
+        
+        if(gammaE < 0.1) 
+            continue;
+
+        HepLorentzVector vec_p4_cms(vec_p3, gammaE);
+        vec_p4_cms.boost(kinematics.CMBoost);
+        particles_p3_cms.push_back(vec_p4_cms.vect());
+        particles_p4_cms.push_back(vec_p4_cms);
+
+        Evis_cms += vec_p4_cms.e();
+    }
+
+    Hep3Vector thrust_cms = thrust(particles_p3_cms.begin(), particles_p3_cms.end(), retSelf);
+    std::pair<double, double> jetMassEnergy = calculateHeavyJetMassEnergy(particles_p4_cms, thrust_cms.unit());
+    heavyJetMass = jetMassEnergy.first;
+
+
+    //---------------------------------------------------------
+    // Additional hadron event selection (for HadronB skimed data)
+
+    Evtcls_hadron_info_Manager& hadronInfo_mgr = Evtcls_hadron_info_Manager::get_manager();
+    double Evis_cms_new = hadronInfo_mgr.begin()->Evis();
+    double heavyJetMass_new = hadronInfo_mgr.begin()->HeavyJetMass();
+
+    cout << "Evis_cms: " << Evis_cms << " Evis_cms_new: " << Evis_cms_new << endl;
+    //cout << "heavyJetMass: " << heavyJetMass << " heavyJetMass_new: " << heavyJetMass_new << endl;
+
+    // additional hadron event selection cuts
+    //if (Evis_cms <= cuts::Evis_cms) 
+    //    return;
+    //if (heavyJetMass <= cuts::HJM_min && heavyJetMass <= cuts::HJM_Evis_ratio*Evis_cms) 
+    //    return;
+
+    //---------------------------------------------------------
+    // start our selection
+    Vp3 hadrons_p3_cms;
+    Vp4 hadrons_p4_cms;
+    hadrons_p3_cms.clear();
+    hadrons_p4_cms.clear();
+    kp_E_cms.clear();
+    kp_px_cms.clear();
+    kp_py_cms.clear();
+    kp_pz_cms.clear();
+    km_E_cms.clear();
+    km_px_cms.clear();
+    km_py_cms.clear();
+    km_pz_cms.clear();
+
+    if (isMC){
+        kp_isSignal.clear();
+        km_isSignal.clear();
+
+        kp_E_cms_gen.clear();
+        kp_px_cms_gen.clear();
+        kp_py_cms_gen.clear();
+        kp_pz_cms_gen.clear();
+        km_E_cms_gen.clear();
+        km_px_cms_gen.clear();
+        km_py_cms_gen.clear();
+        km_pz_cms_gen.clear();
+    }
+
+    for(Mdst_charged_Manager::iterator ch_it=charged_mgr.begin(); ch_it!=charged_mgr.end(); ch_it++){
+        const Mdst_charged &chg = *ch_it;
+
+        Hep3Vector vec_p3(chg.p(0), chg.p(1), chg.p(2));
 
         double dr, dz, refitPx, refitPy, refitPz;
         getDrDz(ch_it, 0, dr, dz, refitPx, refitPy, refitPz);
 
         if(fabs(dr) > cuts::vertexR || fabs(dz) > cuts::vertexZ) 
             continue;
-
-        //Particle p(chg, particleName);
-        Hep3Vector vec_p3(chg.p(0), chg.p(1), chg.p(2));
-        double E = sqrt(vec_p3.mag2() + xmass[2]*xmass[2]); 
-
         double pt = vec_p3.perp();
-        if (pt < cuts::minPt) 
+        if (pt < cuts::trkPt) 
+            continue;
+        if (vec_p3.mag() < cuts::trkP)
+            continue;
+        double cosTheta = cos(vec_p3.theta());
+        if (cosTheta < cuts::trk_cosTheta_min || cosTheta > cuts::trk_cosTheta_max)
             continue;
 
-        HepLorentzVector vec_p4(vec_p3, E);
-        HepLorentzVector vec_p4_boosted(vec_p3, E);
-        vec_p4_boosted.boost(kinematics.CMBoost);
-
+        // identification
+        bool isLepton = false;
         int charge = chg.charge();
-        if(charge == 1) {
-            strcpy(particleName, "pi+");
-            nPip ++;
+        int massHyp = 2;
+
+        eid sel_e(*ch_it);  
+        atc_pid selKPi(3,1,5,3,2);  //K/pi separation
+        atc_pid selPiP(3,1,5,2,4); 
+        atc_pid selKP(3,1,5,3,4);
+        double mu_id = 0;
+        Muid_mdst muID(*ch_it);
+        if (muID.Chi_2() >0) 
+            mu_id = muID.Muon_likelihood();
+
+        double atcKPi=selKPi.prob(*ch_it);
+        double atcKP=selKP.prob(*ch_it);
+        double atcPiP=selPiP.prob(*ch_it);
+
+        float e_cut=0.85;
+        float mu_cut=0.9;
+        double e_id=sel_e.prob(3,-1,5);
+
+        if(mu_id > mu_cut) {
+            massHyp = 1; // muon
+            isLepton = true;
         }
-        else if(charge == -1)  {
-            strcpy(particleName, "pi-");
-            nPim ++;
-            //pim_vecP.push_back({vec_p4.px(), vec_p4.py(), vec_p4.pz(), vec_p4.e()});
+        else if(e_id > e_cut && mu_id < mu_cut) {
+            massHyp = 0; // electron
+            isLepton = true;
         }
-        trk_p.push_back(vec_p3.mag());
-        trk_theta.push_back(vec_p3.theta());
-        trk_phi.push_back(vec_p3.phi());
 
-        allParticles.push_back(vec_p3);
-        allParticles_Boosted.push_back(vec_p4_boosted.vect());
-        chrg_trk_Boosted.push_back(vec_p4_boosted.vect());
-        Vp4s_Boosted.push_back(vec_p4_boosted);
-        Vp4s.push_back(vec_p4);
+        if(!isLepton) {
+            if(atcKPi > 0.6 && atcKP > 0.2) {
+                massHyp = 3; // kaon
+            }
+            else if(atcKPi < 0.6 && atcPiP > 0.2) {
+                massHyp = 2; // pion
+            }
+            else if(atcKP < 0.2 && atcPiP < 0.2) {
+                massHyp = 4; // proton
+            }
+        }
 
-        Energy_cms +=  vec_p4_boosted.e();
-        Evis_cms += vec_p4_boosted.e();
-        BalancePz_cms += vec_p4_boosted.pz();
-        //ECLEnergy += ecl.e();
-        //ECLEnergyWO += ecl.e();
+        // ---------------------------------------------------------
+        // match MC truth and retieve mother particle info
+        if (isMC == 1 && massHyp == 3) {
+            const Gen_hepevt &gen = gen_level(get_hepevt(chg));
+            Gen_hepevt &mother = gen.mother();
+            int mc_mother_pdg = mother.idhep();
+            int mc_pdg = gen.idhep();
 
-    }
+            HepLorentzVector p4_truth(gen.PX(), gen.PY(), gen.PZ(), gen.E());
+            p4_truth.boost(kinematics.CMBoost);
 
-        int nGood = allParticles_Boosted.size(); 
-        if (nGood < 3) return;
+            bool isKaon = false;
+            bool fromPhi = false;
 
-    for(Mdst_gamma_Manager::iterator gam = gamma_mgr.begin(); gam != gamma_mgr.end(); gam++){
-        const Mdst_gamma &gamma = *gam;
-        Mdst_ecl &ecl = gamma.ecl();
+            if (abs(mc_mother_pdg) == 333)
+                fromPhi = true;
 
-        Hep3Vector vec_p3(gamma.p(0), gamma.p(1), gamma.p(2));
+            if (mc_pdg * charge == 321)
+                isKaon = true;
 
-        Mdst_ecl_aux &aux = eclaux_mgr(Panther_ID(gamma.ecl().get_ID()));
-        e9oe25 = aux.e9oe25();
-
-        double gammaE = vec_p3.mag();
-        double ecl_E = ecl.energy();
+            if (charge == 1) {
+                if (isKaon && fromPhi) {
+                    kp_isSignal.push_back(true);
+                    kp_E_cms_gen.push_back(p4_truth.e());
+                    kp_px_cms_gen.push_back(p4_truth.px());
+                    kp_py_cms_gen.push_back(p4_truth.py());
+                    kp_pz_cms_gen.push_back(p4_truth.pz());
+                } else {
+                    kp_isSignal.push_back(false);
+                }
+            }
+            else if(charge == -1)  {
+                if (isKaon && fromPhi) {
+                    km_isSignal.push_back(true);
+                    km_E_cms_gen.push_back(p4_truth.e());
+                    km_px_cms_gen.push_back(p4_truth.px());
+                    km_py_cms_gen.push_back(p4_truth.py());
+                    km_pz_cms_gen.push_back(p4_truth.pz());
+                } else {
+                    km_isSignal.push_back(false);
+                }
+            }
+        }
         
-        if(gammaE < cuts::minPhotonE) 
-            continue;
+        // ---------------------------------------------------------
+        // store track kinematic variables
+        double E = sqrt(vec_p3.mag2() + xmass[massHyp]*xmass[massHyp]); 
+        HepLorentzVector p4_boosted(vec_p3, E);
+        p4_boosted.boost(kinematics.CMBoost);
 
-        cls_p.push_back(gammaE);
-        cls_theta.push_back(vec_p3.theta());
-        cls_phi.push_back(vec_p3.phi());
-
-        double gam_theta = vec_p3.theta() * 180/ PI; 
-        bool thetaInCDCAcceptance = false;
-        if(gam_theta > 17.0  && gam_theta < 150.0 ){
-            thetaInCDCAcceptance = true;
-        } 
-        else{
-            cout << "a photon out of CDC acceptance with theta "<< gam_theta << endl;
+        if (massHyp == 3){
+            if(charge == 1) {
+                kp_E_cms.push_back(p4_boosted.e());
+                kp_px_cms.push_back(p4_boosted.px());
+                kp_py_cms.push_back(p4_boosted.py());
+                kp_pz_cms.push_back(p4_boosted.pz());
+            }
+            else if(charge == -1)  {
+                km_E_cms.push_back(p4_boosted.e());
+                km_px_cms.push_back(p4_boosted.px());
+                km_py_cms.push_back(p4_boosted.py());
+                km_pz_cms.push_back(p4_boosted.pz());
+            }
         }
 
-        HepLorentzVector vec_p4(vec_p3, gammaE);
-        HepLorentzVector vec_p4_boosted(vec_p3, gammaE);
-        vec_p4_boosted.boost(kinematics.CMBoost);
-
-        Energy_cms += vec_p4_boosted.e();
-        ECLEnergyWO += vec_p4.e();
-        if (thetaInCDCAcceptance){
-            Evis_cms += vec_p4_boosted.e();
-            ECLEnergy += vec_p4.e();
-            BalancePz_cms += vec_p4_boosted.pz();
-            nPhoton ++;
-            pho_p.push_back(gammaE);
-            pho_theta.push_back(vec_p3.theta());
-            pho_phi.push_back(vec_p3.phi());
-        }
-        nCluster ++;
-        allParticles.push_back(vec_p3);
-        allParticles_Boosted.push_back(vec_p4_boosted.vect());
-        Vp4s_Boosted.push_back(vec_p4_boosted);
-        Vp4s.push_back(vec_p4);
+        hadrons_p3_cms.push_back(p4_boosted.vect());
+        hadrons_p4_cms.push_back(p4_boosted);
 
     }
-    if (nCluster - nPhoton > 1)
-    cout << Evis_cms << " " << Energy_cms << " " << nPhoton << " "<< nCluster << endl;
 
-    //Hep3Vector t_cms = thrust(allParticles_Boosted.begin(), allParticles_Boosted.end(), retSelf);
-    // test thrust calculation
-    Hep3Vector t_cms = thrust(chrg_trk_Boosted.begin(), chrg_trk_Boosted.end(), retSelf);
-    Hep3Vector t = thrust(allParticles.begin(), allParticles.end(), retSelf);
-    FoxWolfram fw = foxwolfram(allParticles_Boosted.begin(), allParticles_Boosted.end(), retSelf);
-    FoxWolfram fw1 = foxwolfram(allParticles.begin(), allParticles.end(), retSelf);
+    if (hadrons_p3_cms.size() < 3) return;
 
-    HepLorentzVector total_p4 = HepLorentzVector(0,0,0,0);
-    for (size_t i = 0; i < Vp4s.size(); i++) {
-        total_p4 += Vp4s[i];
-    }
-    double Ecms = total_p4.m();
-
-    std::pair<double, double> jetMassEnergy = calculateHeavyJetMassEnergy(Vp4s_Boosted, t_cms.unit());
-    heavyJetMass = jetMassEnergy.first;
-    heavyJetEnergy = jetMassEnergy.second;
-    std::pair<double, double> sph_apl = calculateSphericityAplanarity(Vp4s_Boosted);
-    sphericity = sph_apl.first;
-    aplanarity = sph_apl.second;
+    // ensure there has at least a K+ K- pair
+    if (kp_px_cms.size() * km_px_cms.size() ==0) return;  
     
-
     m_info.evtNo = evtNo;
     m_info.runNo = runNo;
     m_info.expNo = expNo;
-    m_info.Ecms = Ecms;
-    m_info.nGood = nGood;
-    m_info.nPip = nPip;
-    m_info.nPim = nPim;
-    m_info.HeavyJetMass = heavyJetMass;
-    m_info.HeavyJetEnergy = heavyJetEnergy;
-    m_info.sphericity = sphericity;
-    m_info.aplanarity = aplanarity;
-    m_info.nCluster= nCluster;
-    m_info.nPhoton = nPhoton;
-    m_info.Evis_cms = Evis_cms;
-    m_info.BalancePz_cms = BalancePz_cms;
-    m_info.Energy_cms = Energy_cms;
-    m_info.e9oe25 = e9oe25;
-    m_info.ECLEnergy = ECLEnergy;
-    m_info.ECLEnergyWO = ECLEnergyWO;
 
-    double foxwolfram[5] = { fw.R(0), fw.R(1), fw.R(2), fw.R(3), fw.R(4) };
-    memcpy(m_info.foxWolfram, foxwolfram, sizeof(foxwolfram));
-    double thrust_vec[3] = { t_cms.mag(), t_cms.z()/t_cms.mag(), t_cms.phi() };
-    memcpy(m_info.thrust, thrust_vec, sizeof(thrust_vec));
-    double cm_vec[4] = { kinematics.cm.px(), kinematics.cm.py(), kinematics.cm.pz(), kinematics.cm.e() };
-    memcpy(m_info.cms_vecP, cm_vec, sizeof(cm_vec));
+    m_info.sqrts = kinematics.cm.m();
+    //double thrust_vec[3] = { thrust_cms.mag(), thrust_cms.z()/thrust_cms.mag(), thrust_cms.phi() };
+    //memcpy(m_info.thrust, thrust_vec, sizeof(thrust_vec));
 
     tree->Fill();
 
     return;
 }
+
+
+void SpinAlignment::readMC()
+{
+    Vp3 allParticlesCMS_truth;
+
+    allParticlesCMS_truth.clear();
+    kp_E_cms_truth.clear();
+    kp_px_cms_truth.clear();
+    kp_py_cms_truth.clear();
+    kp_pz_cms_truth.clear();
+    km_E_cms_truth.clear();
+    km_px_cms_truth.clear();
+    km_py_cms_truth.clear();
+    km_pz_cms_truth.clear();
+
+    Gen_hepevt_Manager& gen_hep_Mgr = Gen_hepevt_Manager::get_manager();
+
+    for(Gen_hepevt_Manager::iterator gen_it = gen_hep_Mgr.begin(); gen_it != gen_hep_Mgr.end(); ++gen_it) {
+
+        int pid = gen_it->idhep();
+
+        // for daughter particle retrieval
+        Gen_hepevt_Manager& gen_hepevt_mgr = Gen_hepevt_Manager::get_manager();
+
+        if (pid == 333)
+        {
+            int ndaug = (gen_it->daLast() - gen_it->daFirst()) + 1;
+            if (ndaug != 2) continue; // phi -> K+ K- only
+
+            for (int i = 0; i < ndaug; ++i){
+                Panther_ID ID(gen_it->daFirst() + i);
+                Gen_hepevt& daughter = gen_hepevt_mgr(ID);
+                
+                int daughter_pid = daughter.idhep();
+                if (abs(daughter_pid) != 321) continue; // only K+ and K-
+                
+                HepLorentzVector daughter_v4 (daughter.PX(), daughter.PY(), daughter.PZ(), daughter.E());
+                daughter_v4.boost(kinematics.CMBoost);
+
+                if (daughter_pid == 321){
+                    kp_E_cms_truth.push_back(daughter_v4.e());
+                    kp_px_cms_truth.push_back(daughter_v4.px());
+                    kp_py_cms_truth.push_back(daughter_v4.py());
+                    kp_pz_cms_truth.push_back(daughter_v4.pz());
+                }
+                else if (daughter_pid == -321){
+                    km_E_cms_truth.push_back(daughter_v4.e());
+                    km_px_cms_truth.push_back(daughter_v4.px());
+                    km_py_cms_truth.push_back(daughter_v4.py());
+                    km_pz_cms_truth.push_back(daughter_v4.pz());
+                }
+            }
+        }
+
+        HepLorentzVector v4tmp (gen_it->PX(),gen_it->PY(),gen_it->PZ(),gen_it->E()); 
+        v4tmp.boost(kinematics.CMBoost);
+
+        bool isleaf = false;
+        for (int ii = 0; ii < 7; ii++){
+            if(abs(pid) == leafParticleID[ii]) 
+                isleaf = true;
+            if(gen_it->mother() && abs(gen_it->mother().idhep()) == leafParticleID[ii]) 
+            // not counter neutron's daughter, because we have counted neutron as leaf particle
+                isleaf = false;
+        }
+        if (isleaf){
+            allParticlesCMS_truth.push_back(v4tmp.vect());
+        }
+    }
+
+    n_phi_truth = kp_E_cms_truth.size();
+
+    //if (n_phi_truth > 1) 
+    //    cout << "Warning: there are " << n_phi_truth << " phis in this event." << endl;
+    if (n_phi_truth < 1) return; // only one phi per event
+    
+
+    Hep3Vector t_truth = thrust(allParticlesCMS_truth.begin(), allParticlesCMS_truth.end(), retSelf);
+
+    double thrust_vec[3] = { t_truth.mag(), t_truth.z()/t_truth.mag(), t_truth.phi() };
+    for(int i=0; i<3; i++){
+        thrust_truth.push_back(thrust_vec[i]);
+    }
+
+    mctree->Fill();
+
+    return;
+}
+
 
 
 void SpinAlignment::disp_stat(const char*){

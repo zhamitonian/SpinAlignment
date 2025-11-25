@@ -28,14 +28,15 @@ main = b2.create_path()
 
 if len(sys.argv) > 1:
     steering_tools.parse_arguments()
+    steering_tools.setup_environment()
     steering_tools.setup_IO(main)
 else:
     input_mdst = "/group/belle/bdata_b/dstprod/dat/e000069/HadronBJ/0127/continuum/08/HadronBJ-e000069r000823-b20090127_0910.mdst" 
-    output_root = "b2bii_test_thrust_cal.root"
+    #input_mdst = "http://bweb3/mdst.php?ex=69&rs=823&re=823&skm=HadronBorJ&dt=continuum&bl=caseB"
+    output_root = "b2bii_test.root"
     steering_tools.setup_IO(main, input_mdst, output_root)
-    
+
 steering_tools.setup_common_aliases()
-steering_tools.setup_environment()
 
 variables.addAlias('MissingMomCMS', 'missingMomentumOfEventCMS')
 variables.addAlias('CosHelicity', 'cosHelicityAngleMomentum')
@@ -47,8 +48,6 @@ ma.fillParticleList('pi+:track', track_cut, path=main)
 # good cluster & photon
 cluster_cut = 'E > 0.1'
 photon_cut = 'E > 0.1  and thetaInCDCAcceptance'
-#ma.fillParticleList('gamma:cluster', cluster_cut, path=main)
-#ma.fillParticleList('gamma:photon', photon_cut, path=main)
 ma.cutAndCopyList("gamma:photon", "gamma:mdst", photon_cut, path = main)
 ma.cutAndCopyList("gamma:cluster", "gamma:mdst", cluster_cut, path = main)
 
@@ -57,7 +56,6 @@ nTrack_cut = "nCleanedTracks(" + track_cut + ") >= 3"
 ma.applyEventCuts(f"[{nTrack_cut}]", path=main)
 
 variables.addAlias('EnergyCMS', 'formula( useCMSFrame(totalEnergyOfParticlesInList(pi+:track)) + useCMSFrame(totalEnergyOfParticlesInList(gamma:cluster)) )')
-#variables.addAlias('EvisCMS', 'formula( useCMSFrame(sumValueInList(pi+:track, E)) + useCMSFrame(sumValueInList(gamma:photon, E)) )')
 variables.addAlias('EvisCMS', 'formula( useCMSFrame(totalEnergyOfParticlesInList(pi+:track)) + useCMSFrame(totalEnergyOfParticlesInList(gamma:photon)) )')
 
 variables.addAlias('BalancePzCMS', 'formula( useCMSFrame(totalPzOfParticlesInList(pi+:track))+ useCMSFrame(totalPzOfParticlesInList(gamma:photon)) )')
@@ -72,9 +70,7 @@ variables.addAlias('AverageVz', 'formula( averageValueInList(pi+:forvz, dz) )')
 # calculate event kinematics variables 
 ma.buildEventKinematics(['pi+:track', 'gamma:cluster'], path=main)
 
-#ma.buildEventShape(['pi+:track', 'gamma:cluster'], path=main)
-# test thrust calculation with charged tracks only
-ma.buildEventShape(['pi+:track'], path=main)
+ma.buildEventShape(['pi+:track', 'gamma:cluster'], path=main)
 
 variables.addAlias('HeavyJetMass', 'formula( max(forwardHemisphereMass, backwardHemisphereMass) )')
 variables.addAlias('HeavyJetE', 'conditionalVariableSelector(forwardHemisphereMass > backwardHemisphereMass, forwardHemisphereEnergy, backwardHemisphereEnergy)')
@@ -109,14 +105,14 @@ ma.variablesToEventExtraInfo('K*0:spin', {'nParticlesInList(K*0:spin)':'NosKstar
 variables.addAlias('NosKstar', 'ifNANgiveX(eventExtraInfo(NosKstar), 0)')
 
 # event shape variables
-event_vars  = ['Ecms', 'NosTrack', 'NosCluster', 'NosPhoton', 'SkimHad']
+event_vars  = ['Ecms', 'NosTrack', 'NosCluster', 'NosPhoton', 'SkimHad']  # Removed clusterE9E25 - it needs a Particle object
 event_vars += ['NosKstar', 'NosPhi', 'MissingMomCMS']
 event_vars += ['EnergyCMS', 'EvisCMS', 'BalancePzCMS']
 event_vars += ['ECLEnergy', 'ECLEnergyWO', 'AverageVz']
 event_vars += ['HeavyJetMass', 'HeavyJetEnergy']
 event_vars += ['sphericity', 'aplanarity', 'foxWolframR2']
 event_vars += ['thrust', 'thrustAxisCosTheta']
-#event_vars += ['visibleEnergyOfEventCMS', 'missingMomentumOfEventCMS_Pz']
+event_vars += ['beamPx', 'beamPy', 'beamPz', 'beamE']
 
 """
 is_hadron  = ['Ecms', 'SkimHad']
@@ -150,7 +146,8 @@ ma.variablesToNtuple('K*0:spin',
                      path=main)
 """
 
-kinematics = ['p', 'theta', 'phi']
+kinematics = ['p', 'theta', 'phi', 'p_CMS', 'theta_CMS', 'phi_CMS',
+              'E', 'px', 'py', 'pz', 'E_CMS', 'px_CMS', 'py_CMS', 'pz_CMS']
 
 main.add_module('VariablesToEventBasedTree', 
                 fileName=steering_tools.output_file, 
