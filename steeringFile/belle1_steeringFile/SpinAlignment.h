@@ -28,6 +28,7 @@ namespace Belle {
 #endif
 
 typedef std::vector<int> Vint;
+typedef std::vector<bool> Vbool;
 typedef std::vector<double> Vdouble;
 typedef std::vector<HepLorentzVector> Vp4;
 typedef std::vector<Hep3Vector> Vp3;
@@ -45,6 +46,7 @@ class SpinAlignment : public Module{
         void disp_stat(const char*);
         void term();
         void getDrDz(Mdst_charged_Manager::iterator chr_it, int masshyp, double& dr, double& dz, double& refitPx, double& refitPy, double& refitPz);
+        void readMC();
         void other(int*, BelleEvent*, int*);
         std::pair<double, double> calculateHeavyJetMassEnergy(const Vp4 &particles, const Hep3Vector &thrustAxis);
         std::pair<double, double> calculateSphericityAplanarity(const std::vector<HepLorentzVector>& particles);
@@ -54,6 +56,7 @@ class SpinAlignment : public Module{
 
     private:
         int countEvt;
+        int countEvt_fail;
         TRandom3 r1;
         TRandom3 r5;
         TRandom3 r6;
@@ -62,38 +65,41 @@ class SpinAlignment : public Module{
         TRandom3 r9;
         TFile * output_file;
         TTree * tree;
+        TTree * mctree;
         double ler_e;
         double her_e;
         double x_angle;
+
+        double n_phi_truth; // added for truth phi count
 
         struct var_collection{
             int evtNo;
             int runNo;
             int expNo;
-            double Q;
-            double e9oe25;
-            double Ecms;
-            double Evis_cms;
-            double BalancePz_cms;
-            double Energy_cms;
-            double ECLEnergyWO;
-            double ECLEnergy;
+            // event var. used in hadronic selection
+            double Evis;
+            double Esum;
+            double Psum;
+            double Pz;
+            double R2;
             double HeavyJetMass;
-            double HeavyJetEnergy;
-            double sphericity;
-            double aplanarity;
-            int nGood;
-            int nPip;
-            int nPim;
-            int nPhoton;
-            int nCluster;
-            double z;
-            double pt;
-            double foxWolfram[5];
             double thrust[3];
-            double cms_vecP[4];
+            int Ntrk;
+            int Ncls;
+
+            double sqrts;
+            
+            double thrust_truth[3];
+            double qqbar_axis[2];
 
         } m_info;
+
+        Vdouble thrust_truth;
+        Vdouble qqbar_axis;
+        /*
+        struct mc_var_collection{
+            double thrust_truth[3];
+        } m_mc_info; */
 
         struct KinematicsVars {
             double ler_e;
@@ -103,58 +109,46 @@ class SpinAlignment : public Module{
             HepLorentzVector secondElectronCM;
             Hep3Vector CMBoost;
             HepLorentzVector cm;
-            double Q;
             double thrust;
             double thrust_theta;
             double thrust_phi;
+            double sqrts;
         } kinematics;
 
-        Vdouble pho_p;
-        Vdouble pho_theta;
-        Vdouble pho_phi;
-        Vdouble cls_p;
-        Vdouble cls_theta;
-        Vdouble cls_phi;
-        Vdouble trk_p;
-        Vdouble trk_theta;
-        Vdouble trk_phi;
+        Vdouble kp_E_cms;
+        Vdouble kp_px_cms;
+        Vdouble kp_py_cms;
+        Vdouble kp_pz_cms;
+        Vdouble km_E_cms;
+        Vdouble km_px_cms;
+        Vdouble km_py_cms;
+        Vdouble km_pz_cms;
 
-        Vdouble pho_p_CMS;
-        Vdouble pho_theta_CMS;
-        Vdouble pho_phi_CMS;
-        Vdouble cls_p_CMS;
-        Vdouble cls_theta_CMS;
-        Vdouble cls_phi_CMS;
-        Vdouble trk_p_CMS;
-        Vdouble trk_theta_CMS;
-        Vdouble trk_phi_CMS;
+        Vbool kp_isSignal;
+        Vbool km_isSignal;
 
-        Vdouble trk_E;
-        Vdouble trk_px;
-        Vdouble trk_py;
-        Vdouble trk_pz;
-        Vdouble trk_E_CMS;
-        Vdouble trk_px_CMS;
-        Vdouble trk_py_CMS;
-        Vdouble trk_pz_CMS;
+        Vdouble kp_E_cms_gen;
+        Vdouble kp_px_cms_gen;
+        Vdouble kp_py_cms_gen;
+        Vdouble kp_pz_cms_gen;
+        Vdouble km_E_cms_gen;
+        Vdouble km_px_cms_gen;
+        Vdouble km_py_cms_gen;
+        Vdouble km_pz_cms_gen;
 
-        Vdouble cls_E;
-        Vdouble cls_px;
-        Vdouble cls_py;
-        Vdouble cls_pz;
-        Vdouble cls_E_CMS;
-        Vdouble cls_px_CMS;
-        Vdouble cls_py_CMS;
-        Vdouble cls_pz_CMS;
+        Vdouble kp_E_cms_truth;
+        Vdouble kp_px_cms_truth;
+        Vdouble kp_py_cms_truth;
+        Vdouble kp_pz_cms_truth;
+        Vdouble km_E_cms_truth;
+        Vdouble km_px_cms_truth;
+        Vdouble km_py_cms_truth;
+        Vdouble km_pz_cms_truth;
 
-        Vdouble pho_E;
-        Vdouble pho_px;
-        Vdouble pho_py;
-        Vdouble pho_pz;
-        Vdouble pho_E_CMS;
-        Vdouble pho_px_CMS;
-        Vdouble pho_py_CMS;
-        Vdouble pho_pz_CMS;
+        Vdouble kp_theta;
+        Vdouble km_theta;
+
+        bool isMC;
 };
 
 

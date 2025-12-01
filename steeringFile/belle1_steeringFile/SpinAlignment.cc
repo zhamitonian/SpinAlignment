@@ -41,8 +41,8 @@ using namespace std;
 qqbar(udsc) -> phi+ + anything                             
          \-> K+ K-                                 
 
-version : v2.0.0
-Date    : 2025.11.25
+version : v2.1.0
+Date    : 2025.12.01
 Author  : Zhen Wang
 */
 
@@ -66,9 +66,7 @@ SpinAlignment::SpinAlignment(){
     r8.SetSeed(800);
     r9.SetSeed(900);
 
-    //#isMC = Belle_event_Manager::get_manager().begin()->MCFlag();
     isMC = true;
-
     return;
 }
 
@@ -87,10 +85,15 @@ void SpinAlignment::begin_run(BelleEvent* evptr, int* status){
     IpProfile::begin_run();
     BeamEnergy::begin_run();
 
+    
     kinematics.ler_e = BeamEnergy::E_LER();
     kinematics.her_e = BeamEnergy::E_HER();
     kinematics.x_angle = BeamEnergy::Cross_angle();
-
+    /*     
+    kinematics.ler_e = 3.5;
+    kinematics.her_e = 7.9965;
+    kinematics.x_angle = 0.022;
+    */
     if(kinematics.ler_e < 3.0 || kinematics.her_e < 7.0 || kinematics.ler_e > 5.0 || kinematics.her_e > 9.0){
         cout<<"someting is wrong ler_e is "<< kinematics.ler_e << " her_e is "<< kinematics.her_e <<endl;
         return;
@@ -101,7 +104,6 @@ void SpinAlignment::begin_run(BelleEvent* evptr, int* status){
     kinematics.firstElectronCM = HepLorentzVector(kinematics.her_e * sin(kinematics.x_angle), 0., kinematics.her_e * cos(kinematics.x_angle), kinematics.her_e);
     kinematics.secondElectronCM = HepLorentzVector(0., 0., -kinematics.ler_e, kinematics.ler_e);
     kinematics.sqrts = kinematics.cm.m();
-
 
     return;
 }
@@ -127,18 +129,20 @@ void SpinAlignment::hist_def(){
     ADDBRANCH(evtNo, I);
     ADDBRANCH(runNo, I);
     ADDBRANCH(expNo, I);
-    ADDBRANCH(Evis_cms, D);
-    ADDBRANCH(sqrts, D);
-    ADDBRANCH(PrimeVr, D);
-    ADDBRANCH(PrimeVz, D);
+    // event var. used in hadronic selection
+    ADDBRANCH(Evis, D);
+    ADDBRANCH(Esum, D);
+    ADDBRANCH(Psum, D);
+    ADDBRANCH(Pz, D);
+    ADDBRANCH(R2, D);
+    ADDBRANCH(HeavyJetMass, D);
+    ADDBRANCH(Ntrk, I);
+    ADDBRANCH(Ncls, I);
 
-    //ADDBRANCH(HeavyJetMass, D);
-    //ADDBRANCH(HeavyJetEnergy, D);
-    //ADDBRANCH(sphericity, D);
-    //ADDBRANCH(aplanarity, D);
-    //ADDBRANCH(nGood, I);
-    //ADDBARRAY(foxWolfram, 5, D);
+    ADDBRANCH(sqrts, D);
+
     ADDBARRAY(thrust, 3, D);
+    
 
     if (isMC){
         mctree->Branch("kp_E_cms_truth", &kp_E_cms_truth);
@@ -152,6 +156,9 @@ void SpinAlignment::hist_def(){
 
         mctree->Branch("thrust_truth", &thrust_truth);
         mctree->Branch("qqbar_axis", &qqbar_axis);
+
+        mctree->Branch("kp_theta", &kp_theta);
+        mctree->Branch("km_theta", &km_theta);
     }
 
     // vector<double> type branches
@@ -193,6 +200,16 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
     int  evtNo=Belle_event_Manager::get_manager().begin()->EvtNo();
     int  runNo=Belle_event_Manager::get_manager().begin()->RunNo();
 
+    Evtcls_hadronic_flag_Manager& ClassMgr = Evtcls_hadronic_flag_Manager::get_manager();
+
+    int EvtClsFlgB = ClassMgr.begin()->hadronic_flag(2);
+
+    if(!EvtClsFlgB){
+        //cout << "event " << evtNo << " in run " << runNo << " exp " << expNo << " is not hadronB skimed data!" << endl;
+        //cout << EvtClsFlgB << endl;
+        return; // only process hadronB skimed data)
+    }
+
     if (isMC == 1){
         thrust_truth.clear();
         qqbar_axis.clear();
@@ -216,80 +233,114 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
     particles_p3_cms.clear();
     particles_p4_cms.clear();
 
-    // track primary vertex fit
-    kvertexfitter kv;
-    HepPoint3D ip = IpProfile::position(1); // 1 for event-dependent IP
-    HepSymMatrix errIp = IpProfile::position_err(1);
-    kv.initialVertex(ip);
-    kv.vertexProfile(errIp);
-
+    // ----------------------------------------------------------------------------------
+    // same to EventClassify.cc to keep thrust calculation consistent
+    /*
+    same to later implementation 
     for(Mdst_charged_Manager::iterator ch_it=charged_mgr.begin(); ch_it!=charged_mgr.end(); ch_it++){
-        const Mdst_charged &chg = *ch_it;
-        Hep3Vector vec_p3(chg.p(0), chg.p(1), chg.p(2));
+        Mdst_charged Charged = *ch_it;
+        Mdst_trk& Trk = Charged.trk();
+        Mdst_trk_fit& Trkfit = Trk.mhyp(2);
+        Hep3Vector P ( Charged.px(), Charged.py(), Charged.pz() ); 
+        float dr       = Trkfit.helix(0);
+        float dz       = Trkfit.helix(3);
 
-        /*
-        double dr, dz, refitPx, refitPy, refitPz;
-        getDrDz(ch_it, 0, dr, dz, refitPx, refitPy, refitPz);
+        if(P.perp() >= 0.1 && abs(dr) <2 && abs(dz) <4){
+        
+        double E = sqrt(P.mag2() + xmass[2]*xmass[2]);  // pion mass hypothesis 
+        HepLorentzVector P_cms(P,E);
+        P_cms.boost(kinematics.CMBoost);
 
-        if(fabs(dr) >= 2 || fabs(dz) >= 4) 
-            continue;
-        double pt = vec_p3.perp();
-        if (pt < 0.1) 
-            continue;
-        */
-        double E = sqrt(vec_p3.mag2() + xmass[2]*xmass[2]);  // pion mass hypothesis 
-        if (E < 0.1) 
-            continue;
+        //if (E < 0.1) 
+        //    continue;
+        particles_p3_cms.push_back(P_cms.vect());
+        particles_p4_cms.push_back(P_cms);
 
-        HepLorentzVector vec_p4_cms(vec_p3, E);
-        vec_p4_cms.boost(kinematics.CMBoost);
-        particles_p3_cms.push_back(vec_p4_cms.vect());
-        particles_p4_cms.push_back(vec_p4_cms);
-
+        }
     }
 
     for(Mdst_gamma_Manager::iterator gam = gamma_mgr.begin(); gam != gamma_mgr.end(); gam++){
-        const Mdst_gamma &gamma = *gam;
-        Mdst_ecl &ecl = gamma.ecl();
-
-        // Here we check the unassociated track and their quality
-        // match: the cluster matched with charged tracks in CDC
-        //        =0: not match; -1:shower-trk; -2: charged-trk;
-        // quality: ECL data quality. in gsim, =0:good cluster.
-        //if(ecl.match() != 0 || ecl.quality() != 0)
-        /*
-        if(ecl.match() != 0)
-            continue;
-        */
-        Hep3Vector vec_p3(gamma.p(0), gamma.p(1), gamma.p(2));
-        double gammaE = vec_p3.mag();
-        
-        if(gammaE < 0.1) 
-            continue;
-
-        HepLorentzVector vec_p4_cms(vec_p3, gammaE);
-        vec_p4_cms.boost(kinematics.CMBoost);
-        particles_p3_cms.push_back(vec_p4_cms.vect());
-        particles_p4_cms.push_back(vec_p4_cms);
+        Mdst_gamma& Gamma = *gam;           
+        Mdst_ecl& Ecl = Gamma.ecl();
+        Hep3Vector P ( Gamma.px(), Gamma.py(), Gamma.pz() ); 
+        // Define momentum vector
+        if(Ecl.quality() ==0 && P.mag() >= 0.1){
+            double E = P.mag();
+            HepLorentzVector vec_p4(P, E);
+            vec_p4.boost(kinematics.CMBoost);
+            particles_p3_cms.push_back(vec_p4.vect());
+            particles_p4_cms.push_back(vec_p4);
+        }
     }
+    
+    Hep3Vector thr_test = thrust(particles_p3_cms.begin(), particles_p3_cms.end(), retSelf);
+    double thrustA = thr_test.mag();
 
-    Hep3Vector thrust_cms = thrust(particles_p3_cms.begin(), particles_p3_cms.end(), retSelf);
+    particles_p3_cms.clear();
+    particles_p4_cms.clear();
+    */
 
-    //---------------------------------------------------------
+Evtcls_hadron_charged_Manager& hadron_chg_mgr = Evtcls_hadron_charged_Manager::get_manager();
+for(Evtcls_hadron_charged_Manager::iterator it = hadron_chg_mgr.begin();
+    it != hadron_chg_mgr.end(); it++){
+
+    if (!it->charged()) continue;  // Check if charged is valid
+
+    const Mdst_charged& Charged = it->charged();
+    Hep3Vector P(Charged.px(), Charged.py(), Charged.pz());
+    
+    double E = sqrt(P.mag2() + xmass[2]*xmass[2]);
+    HepLorentzVector P_cms(P,E);
+    P_cms.boost(kinematics.CMBoost);
+    
+    particles_p3_cms.push_back(P_cms.vect());
+    particles_p4_cms.push_back(P_cms);
+}
+
+// 对 gamma 也类似
+Evtcls_hadron_neutral_Manager& hadron_neu_mgr = Evtcls_hadron_neutral_Manager::get_manager();
+
+for(Evtcls_hadron_neutral_Manager::iterator it = hadron_neu_mgr.begin();
+    it != hadron_neu_mgr.end(); it++){
+    
+    if (!it->gamma()) continue;  // Check if gamma is valid
+    
+    const Mdst_gamma& Gamma = it->gamma();
+    Hep3Vector P(Gamma.px(), Gamma.py(), Gamma.pz());
+    
+    double E = P.mag();
+    HepLorentzVector vec_p4(P, E);
+    vec_p4.boost(kinematics.CMBoost);
+    
+    particles_p3_cms.push_back(vec_p4.vect());
+    particles_p4_cms.push_back(vec_p4);
+}
+
+    //Hep3Vector thr = thrust(particles_p3_cms.begin(), particles_p3_cms.end(), retSelf);
+    Hep3Vector thr = thrust(particles_p3_cms.begin(), particles_p3_cms.end(), SelfFunc(Hep3Vector()));
+    Hep3Vector tn  = thr.unit();
+    double ThrParam = thr.mag();
+
+    // ----------------------------------------------------------------------------------
     // Additional hadron event selection (for HadronB skimed data)
 
     Evtcls_hadron_info_Manager& hadronInfo_mgr = Evtcls_hadron_info_Manager::get_manager();
-    double Evis_cms = hadronInfo_mgr.begin()->Evis();
-    double Ntrk = hadronInfo_mgr.begin()->Ntrk();
-    double heavyJetMass = hadronInfo_mgr.begin()->HeavyJetMass();
-    if (Evis_cms < cuts::Evis_cms) 
+    double Evis = hadronInfo_mgr.begin()->Evis();
+    double Esum = hadronInfo_mgr.begin()->Esum();
+    double Psum = hadronInfo_mgr.begin()->Psum();
+    double Pz   = hadronInfo_mgr.begin()->Pz();
+    double R2   = hadronInfo_mgr.begin()->R2();
+    double HeavyJetMass = hadronInfo_mgr.begin()->HeavyJetMass();
+    int Ntrk = hadronInfo_mgr.begin()->Ntrk();
+    int Ncls = hadronInfo_mgr.begin()->Ncls();
+    double Thrust = hadronInfo_mgr.begin()->Thrust();
+    if(Evis < cuts::Evis)
         return;
-    if (Ntrk < 3){
-        //cout << "Warning: Ntrk = " << Ntrk << endl;
-        return;
-    }
+    //if(abs(Thrust - ThrParam) > 0.0001)
+    //cout << "read: " << Thrust << " calc: " << ThrParam << endl; 
+    // ----------------------------------------------------------------------------------
+    
 
-    //---------------------------------------------------------
     // start our selection
     Vp3 hadrons_p3_cms;
     Vp4 hadrons_p4_cms;
@@ -316,6 +367,7 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
         km_px_cms_gen.clear();
         km_py_cms_gen.clear();
         km_pz_cms_gen.clear();
+
     }
 
     for(Mdst_charged_Manager::iterator ch_it=charged_mgr.begin(); ch_it!=charged_mgr.end(); ch_it++){
@@ -456,8 +508,16 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
     m_info.evtNo = evtNo;
     m_info.runNo = runNo;
     m_info.expNo = expNo;
+    m_info.Evis = Evis;
+    m_info.Esum = Esum;
+    m_info.Psum = Psum;
+    m_info.Pz   = Pz;
+    m_info.R2   = R2;
+    m_info.HeavyJetMass = HeavyJetMass;
+    m_info.Ntrk = Ntrk;
+    m_info.Ncls = Ncls;
     m_info.sqrts = kinematics.cm.m();
-    double thrust_vec[3] = { thrust_cms.mag(), thrust_cms.z()/thrust_cms.mag(), thrust_cms.phi() };
+    double thrust_vec[3] = { thr.mag(), thr.z()/thr.mag(), thr.phi() };
     memcpy(m_info.thrust, thrust_vec, sizeof(thrust_vec));
 
     tree->Fill();
@@ -479,6 +539,8 @@ void SpinAlignment::readMC()
     km_px_cms_truth.clear();
     km_py_cms_truth.clear();
     km_pz_cms_truth.clear();
+    kp_theta.clear();
+    km_theta.clear();
 
     int Nquark = 0;
     HepLorentzVector q_momentum(0.,0.,0.,0.);
@@ -508,6 +570,7 @@ void SpinAlignment::readMC()
                 if (abs(daughter_pid) != 321) continue; // only K+ and K-
                 
                 HepLorentzVector daughter_v4 (daughter.PX(), daughter.PY(), daughter.PZ(), daughter.E());
+                double theta_lab = daughter_v4.vect().theta()*180.0/acos(-1.0);
                 daughter_v4.boost(kinematics.CMBoost);
 
                 if (daughter_pid == 321){
@@ -515,12 +578,14 @@ void SpinAlignment::readMC()
                     kp_px_cms_truth.push_back(daughter_v4.px());
                     kp_py_cms_truth.push_back(daughter_v4.py());
                     kp_pz_cms_truth.push_back(daughter_v4.pz());
+                    kp_theta.push_back(theta_lab);
                 }
                 else if (daughter_pid == -321){
                     km_E_cms_truth.push_back(daughter_v4.e());
                     km_px_cms_truth.push_back(daughter_v4.px());
                     km_py_cms_truth.push_back(daughter_v4.py());
                     km_pz_cms_truth.push_back(daughter_v4.pz());
+                    km_theta.push_back(theta_lab);
                 }
             }
         }
@@ -748,3 +813,13 @@ void SpinAlignment::other(int* , BelleEvent*, int* ){
 #if defined(BELLE_NAMESPACE)
 } // namespace Belle
 #endif
+
+
+// version log 
+// v2.0.1 : 
+// add MC truth var for the track if in barrel rapidity region
+// Nov 25 2025, Zhen Wang
+
+// v2.1.0 :
+// use hadronB ect flag and correct thrust calculation
+// Dec 01 2025, Zhen Wang

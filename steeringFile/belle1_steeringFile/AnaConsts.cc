@@ -16,16 +16,22 @@
 namespace Belle {
 #endif
 
-double xmass[5]={0, 0.105658, 0.13957, 0.4937, 0.938272};
+double xmass[5]={0, 0.105658, 0.13956995, 0.4937, 0.938272};
+int   leafParticleID[7]={11,13,211,321,2212,22,2112};
 double PI = 3.141592653589793;
 
 namespace cuts{
-    double vertexZ = 3.0;
-    double vertexR = 1.0;
-    double minTrackPt = 0.1;
-    double minPhotonE = 0.1;
-    double minNGoodTracks = 3;
-    double minPt = 0.1;
+    double vertexZ = 4.0;
+    double vertexR = 2.0;
+    double trkPt= 0.05;
+    double trkP = 0.5;
+    double trk_cosTheta_min = -0.511;
+    double trk_cosTheta_max = 0.842;
+    double Evis = 7;
+    double PrimeVr = 1.5;
+    double PrimeVz = 3.5;
+    double HJM_min = 1.8;
+    double HJM_Evis_ratio = 0.25;
 }
 
 #if defined(BELLE_NAMESPACE)
