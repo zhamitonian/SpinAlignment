@@ -123,6 +123,8 @@ class SpinAlignment : public Module{
         Vdouble km_px_cms;
         Vdouble km_py_cms;
         Vdouble km_pz_cms;
+        Vdouble kp_p;
+        Vdouble km_p;
 
         Vbool kp_isSignal;
         Vbool km_isSignal;

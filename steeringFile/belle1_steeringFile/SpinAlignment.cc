@@ -41,8 +41,8 @@ using namespace std;
 qqbar(udsc) -> phi+ + anything                             
          \-> K+ K-                                 
 
-version : v2.1.0
-Date    : 2025.12.01
+version : v2.1.1
+Date    : 2025.12.02
 Author  : Zhen Wang
 */
 
@@ -170,6 +170,9 @@ void SpinAlignment::hist_def(){
     tree->Branch("km_px_cms", &km_px_cms);
     tree->Branch("km_py_cms", &km_py_cms);
     tree->Branch("km_pz_cms", &km_pz_cms);
+
+    tree->Branch("kp_p", &kp_p);
+    tree->Branch("km_p", &km_p);
 
     if(isMC){
         tree->Branch("kp_E_cms_gen", &kp_E_cms_gen);
@@ -355,6 +358,9 @@ for(Evtcls_hadron_neutral_Manager::iterator it = hadron_neu_mgr.begin();
     km_py_cms.clear();
     km_pz_cms.clear();
 
+    kp_p.clear();
+    km_p.clear();
+
     if (isMC){
         kp_isSignal.clear();
         km_isSignal.clear();
@@ -383,8 +389,8 @@ for(Evtcls_hadron_neutral_Manager::iterator it = hadron_neu_mgr.begin();
         double pt = vec_p3.perp();
         if (pt < cuts::trkPt) 
             continue;
-        if (vec_p3.mag() < cuts::trkP)
-            continue;
+        //if (vec_p3.mag() < cuts::trkP)
+        //    continue;
         double cosTheta = cos(vec_p3.theta());
         if (cosTheta < cuts::trk_cosTheta_min || cosTheta > cuts::trk_cosTheta_max)
             continue;
@@ -488,12 +494,14 @@ for(Evtcls_hadron_neutral_Manager::iterator it = hadron_neu_mgr.begin();
                 kp_px_cms.push_back(p4_boosted.px());
                 kp_py_cms.push_back(p4_boosted.py());
                 kp_pz_cms.push_back(p4_boosted.pz());
+                kp_p.push_back(vec_p3.mag());
             }
             else if(charge == -1)  {
                 km_E_cms.push_back(p4_boosted.e());
                 km_px_cms.push_back(p4_boosted.px());
                 km_py_cms.push_back(p4_boosted.py());
                 km_pz_cms.push_back(p4_boosted.pz());
+                km_p.push_back(vec_p3.mag());
             }
         }
 
@@ -823,3 +831,6 @@ void SpinAlignment::other(int* , BelleEvent*, int* ){
 // v2.1.0 :
 // use hadronB ect flag and correct thrust calculation
 // Dec 01 2025, Zhen Wang
+
+// v2.1.1 :
+// Not apply track momentum cut, and save it
