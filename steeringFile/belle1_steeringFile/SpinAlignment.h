@@ -149,6 +149,10 @@ class SpinAlignment : public Module{
 
         Vdouble kp_theta;
         Vdouble km_theta;
+        Vdouble kp_p_truth;
+        Vdouble km_p_truth;
+        Vdouble kp_pt_truth;
+        Vdouble km_pt_truth;                    
 
         bool isMC;
 };

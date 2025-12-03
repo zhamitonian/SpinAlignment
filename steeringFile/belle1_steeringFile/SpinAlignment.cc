@@ -41,8 +41,8 @@ using namespace std;
 qqbar(udsc) -> phi+ + anything                             
          \-> K+ K-                                 
 
-version : v2.1.1
-Date    : 2025.12.02
+version : v2.1.2
+Date    : 2025.12.03
 Author  : Zhen Wang
 */
 
@@ -159,6 +159,10 @@ void SpinAlignment::hist_def(){
 
         mctree->Branch("kp_theta", &kp_theta);
         mctree->Branch("km_theta", &km_theta);
+        mctree->Branch("kp_p_truth", &kp_p_truth);
+        mctree->Branch("km_p_truth", &km_p_truth);
+        mctree->Branch("kp_pt_truth", &kp_pt_truth);
+        mctree->Branch("km_pt_truth", &km_pt_truth);
     }
 
     // vector<double> type branches
@@ -549,6 +553,10 @@ void SpinAlignment::readMC()
     km_pz_cms_truth.clear();
     kp_theta.clear();
     km_theta.clear();
+    kp_p_truth.clear();
+    km_p_truth.clear();
+    kp_pt_truth.clear();
+    km_pt_truth.clear();
 
     int Nquark = 0;
     HepLorentzVector q_momentum(0.,0.,0.,0.);
@@ -579,6 +587,8 @@ void SpinAlignment::readMC()
                 
                 HepLorentzVector daughter_v4 (daughter.PX(), daughter.PY(), daughter.PZ(), daughter.E());
                 double theta_lab = daughter_v4.vect().theta()*180.0/acos(-1.0);
+                double p = daughter_v4.vect().mag();
+                double pt = daughter_v4.vect().perp();
                 daughter_v4.boost(kinematics.CMBoost);
 
                 if (daughter_pid == 321){
@@ -587,6 +597,8 @@ void SpinAlignment::readMC()
                     kp_py_cms_truth.push_back(daughter_v4.py());
                     kp_pz_cms_truth.push_back(daughter_v4.pz());
                     kp_theta.push_back(theta_lab);
+                    kp_p_truth.push_back(p);
+                    kp_pt_truth.push_back(pt);
                 }
                 else if (daughter_pid == -321){
                     km_E_cms_truth.push_back(daughter_v4.e());
@@ -594,6 +606,8 @@ void SpinAlignment::readMC()
                     km_py_cms_truth.push_back(daughter_v4.py());
                     km_pz_cms_truth.push_back(daughter_v4.pz());
                     km_theta.push_back(theta_lab);
+                    km_p_truth.push_back(p);
+                    km_pt_truth.push_back(pt);
                 }
             }
         }
@@ -608,9 +622,9 @@ void SpinAlignment::readMC()
             //if (pid == 130) // K_L0
             //    continue;
 
-            if (gen_it->E() > 0.1) { // same cut as in reconstructed level
-                allParticlesCMS_truth.push_back(v4tmp.vect());
-           }
+            //if (gen_it->E() > 0.1) { // same cut as in reconstructed level
+            //    allParticlesCMS_truth.push_back(v4tmp.vect());
+            //}
         }
 
         if (abs(pid) == 1 || abs(pid) == 2 || abs(pid) == 3 || abs(pid) == 4) {
@@ -834,3 +848,6 @@ void SpinAlignment::other(int* , BelleEvent*, int* ){
 
 // v2.1.1 :
 // Not apply track momentum cut, and save it
+
+// v2.1.2 :
+// Save truth level kaon 's p, pt
