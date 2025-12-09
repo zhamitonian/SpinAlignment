@@ -41,7 +41,7 @@ using namespace std;
 -----------------------------------------
 hadronB data vs MC comparison
 
-version : v1.0.0
+version : v1.0.1
 Date    : 2025.12.04
 Author  : Zhen Wang
 */
@@ -97,35 +97,35 @@ void HadronB_dataMC_comp::hist_def(){
     
     // Create histograms for event variables
     h_Evis = new TH1F("h_Evis", "Visible Energy;E_{vis} (GeV);[MeV]", 100, 1, 13);
-    h_HeavyJetMass_over_Evis = new TH1F("h_HeavyJetMass_over_Evis", "Heavy Jet Mass / E_{vis};M_{jet}/E_{vis};[]", 100, 0, 1);
-    h_Esum = new TH1F("h_Esum", "Sum Energy;E_{sum} (GeV);[MeV]", 100, 0, 12.5);
-    h_Psum = new TH1F("h_Psum", "Sum Momentum;P_{sum} (GeV/c);[MeV]", 100, 0, 15);
+    h_HeavyJetMass_over_Evis = new TH1F("h_HeavyJetMass_over_Evis", "Heavy Jet Mass / E_{vis};M_{jet}/E_{vis};[]", 60, 0.1, 0.7);
+    h_Esum = new TH1F("h_Esum", "Sum Energy;E_{sum} (GeV);[MeV]", 100, 0, 10);
+    h_Psum = new TH1F("h_Psum", "Sum Momentum;P_{sum} (GeV/c);[MeV]", 100, 0, 12);
     h_Pz = new TH1F("h_Pz", "Z Momentum;P_{z} (GeV/c);[MeV]", 100, -5, 5);
     h_R2 = new TH1F("h_R2", "R2;R2;[]", 100, 0, 1);
-    h_HeavyJetMass = new TH1F("h_HeavyJetMass", "Heavy Jet Mass;M_{jet} (GeV/c^{2});[MeV]", 100, 0, 8);
+    h_HeavyJetMass = new TH1F("h_HeavyJetMass", "Heavy Jet Mass;M_{jet} (GeV/c^{2});[MeV]", 78, 0.5, 6);
     h_Ntrk = new TH1F("h_Ntrk", "Number of Tracks;N_{trk};[]", 20, 0, 20);
     h_Ncls = new TH1F("h_Ncls", "Number of Clusters;N_{cls};[]", 25, 0, 25);
     h_thrust = new TH1F("h_thrust", "Thrust;Thrust;[]", 100, 0.5, 1.0);
     h_thrust_costheta = new TH1F("h_thrust_costheta", "Thrust cos#theta;cos#theta;[]", 100, -1, 1);
     h_thrust_phi = new TH1F("h_thrust_phi", "Thrust #phi;#phi (rad);[rad]", 100, -3.15, 3.15);
-    h_HeavyJetEnergy = new TH1F("h_HeavyJetEnergy", "Heavy Jet Energy;E_{jet} (GeV);[MeV]", 100, 0, 8);
+    h_HeavyJetEnergy = new TH1F("h_HeavyJetEnergy", "Heavy Jet Energy;E_{jet} (GeV);[MeV]", 75, 1.5, 7.5);
     h_Sphericity = new TH1F("h_Sphericity", "Sphericity;S;[]", 100, 0, 1);
     h_Aplanarity = new TH1F("h_Aplanarity", "Aplanarity;A;[]", 100, 0, 0.5);
     
     // Create histograms for all charged tracks (lab frame)
-    h_trk_dr = new TH1F("h_trk_dr", "Track dr;dr (cm);[cm]", 100, -2, 2);
+    h_trk_dr = new TH1F("h_trk_dr", "Track dr;dr (cm);[cm]", 100, -1, 1);
     h_trk_dz = new TH1F("h_trk_dz", "Track dz;dz (cm);[cm]", 100, -4, 4);
     h_trk_p = new TH1F("h_trk_p", "Track Momentum;p (GeV/c);[MeV]", 100, 0, 5);
     h_trk_costheta = new TH1F("h_trk_costheta", "Track cos#theta;cos#theta;[]", 100, -1, 1);
     h_trk_phi = new TH1F("h_trk_phi", "Track #phi;#phi (rad);[rad]", 100, -3.15, 3.15);
     
     // Create histograms for photons
-    h_photon_p = new TH1F("h_photon_p", "Photon Momentum;p (GeV/c);[MeV]", 100, 0, 5);
-    h_photon_costheta = new TH1F("h_photon_costheta", "Photon cos#theta;cos#theta;[]", 100, -1, 1);
-    h_photon_phi = new TH1F("h_photon_phi", "Photon #phi;#phi (rad);[rad]", 100, -3.15, 3.15);
+    h_photon_p = new TH1F("h_photon_p", "Photon Momentum;p (GeV/c);[MeV]", 50, 0, 2.5);
+    h_photon_costheta = new TH1F("h_photon_costheta", "Photon cos#theta;cos#theta;[]", 40, -1, 1);
+    h_photon_phi = new TH1F("h_photon_phi", "Photon #phi;#phi (rad);[rad]", 40, -3.15, 3.15);
     
     // Create histograms for primary vertex
-    h_PrimeR = new TH1F("h_PrimeR", "Primary Vertex R;R (cm);[cm]", 100, 0, 0.75);
+    h_PrimeR = new TH1F("h_PrimeR", "Primary Vertex R;R (cm);[cm]", 40, 0, 0.2);
     h_PrimeZ = new TH1F("h_PrimeZ", "Primary Vertex Z;Z (cm);[cm]", 100, -2, 2);
 }
 
@@ -464,3 +464,5 @@ void HadronB_dataMC_comp::other(int* , BelleEvent*, int* ){
 // version log 
 // v1.0.0 : 
 //  - First version for hadronB data vs MC comparison
+// v1.0.1 :
+//  - modify binning and range of histograms
