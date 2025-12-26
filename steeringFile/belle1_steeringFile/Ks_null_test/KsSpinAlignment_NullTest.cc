@@ -46,8 +46,8 @@ K_S is spin-0, so spin alignment should be zero
 This serves as a validation of the analysis method
 -----------------------------------------
 
-version : v1.0.0
-Date    : 2025.12.24
+version : v1.0.1
+Date    : 2025.12.26
 Author  : Zhen Wang
 */
 
@@ -406,43 +406,63 @@ for(Evtcls_hadron_neutral_Manager::iterator it = hadron_neu_mgr.begin();
         // ---------------------------------------------------------
         // match MC truth and retrieve mother particle info
         if (isMC == 1 && massHyp == 2) {  // Check pions (massHyp == 2)
-            const Gen_hepevt &gen = gen_level(get_hepevt(chg));
-            Gen_hepevt &mother = gen.mother();
-            int mc_mother_pdg = mother.idhep();
-            int mc_pdg = gen.idhep();
-
-            HepLorentzVector p4_truth(gen.PX(), gen.PY(), gen.PZ(), gen.E());
-            p4_truth.boost(kinematics.CMBoost);
-
-            bool isPion = false;
-            bool fromKs = false;
-
-            if (abs(mc_mother_pdg) == 310)  // K_S (PDG = 310)
-                fromKs = true;
-
-            if (mc_pdg * charge == 211)  // pi± (PDG = ±211)
-                isPion = true;
-
-            if (charge == 1) {
-                if (isPion && fromKs) {
-                    pip_isSignal.push_back(true);
-                    pip_E_cms_gen.push_back(p4_truth.e());
-                    pip_px_cms_gen.push_back(p4_truth.px());
-                    pip_py_cms_gen.push_back(p4_truth.py());
-                    pip_pz_cms_gen.push_back(p4_truth.pz());
-                } else {
+            // Check if MC truth exists for this particle
+            if (!get_hepevt(chg)) {
+                // No MC truth - mark as not signal
+                if (charge == 1) {
                     pip_isSignal.push_back(false);
-                }
-            }
-            else if(charge == -1)  {
-                if (isPion && fromKs) {
-                    pim_isSignal.push_back(true);
-                    pim_E_cms_gen.push_back(p4_truth.e());
-                    pim_px_cms_gen.push_back(p4_truth.px());
-                    pim_py_cms_gen.push_back(p4_truth.py());
-                    pim_pz_cms_gen.push_back(p4_truth.pz());
-                } else {
+                } else if (charge == -1) {
                     pim_isSignal.push_back(false);
+                }
+            } else {
+                const Gen_hepevt &gen = gen_level(get_hepevt(chg));
+                
+                // Check if particle has a mother
+                if (!gen.mother()) {
+                    if (charge == 1) {
+                        pip_isSignal.push_back(false);
+                    } else if (charge == -1) {
+                        pim_isSignal.push_back(false);
+                    }
+                } else {
+                    Gen_hepevt &mother = gen.mother();
+                    int mc_mother_pdg = mother.idhep();
+                    int mc_pdg = gen.idhep();
+
+                    HepLorentzVector p4_truth(gen.PX(), gen.PY(), gen.PZ(), gen.E());
+                    p4_truth.boost(kinematics.CMBoost);
+
+                    bool isPion = false;
+                    bool fromKs = false;
+
+                    if (abs(mc_mother_pdg) == 310)  // K_S (PDG = 310)
+                        fromKs = true;
+
+                    if (mc_pdg * charge == 211)  // pi± (PDG = ±211)
+                        isPion = true;
+
+                    if (charge == 1) {
+                        if (isPion && fromKs) {
+                            pip_isSignal.push_back(true);
+                            pip_E_cms_gen.push_back(p4_truth.e());
+                            pip_px_cms_gen.push_back(p4_truth.px());
+                            pip_py_cms_gen.push_back(p4_truth.py());
+                            pip_pz_cms_gen.push_back(p4_truth.pz());
+                        } else {
+                            pip_isSignal.push_back(false);
+                        }
+                    }
+                    else if(charge == -1)  {
+                        if (isPion && fromKs) {
+                            pim_isSignal.push_back(true);
+                            pim_E_cms_gen.push_back(p4_truth.e());
+                            pim_px_cms_gen.push_back(p4_truth.px());
+                            pim_py_cms_gen.push_back(p4_truth.py());
+                            pim_pz_cms_gen.push_back(p4_truth.pz());
+                        } else {
+                            pim_isSignal.push_back(false);
+                        }
+                    }
                 }
             }
         }
@@ -537,6 +557,7 @@ void KsSpinAlignment_NullTest::readMC()
             //if (ndaug != 2) continue; // K_S -> pi+ pi- only
             if (ndaug != 2){
                 cout << "Warning: K_S decay daughters number is " << ndaug << endl;
+                continue;
             }
 
             for (int i = 0; i < ndaug; ++i){
@@ -803,3 +824,6 @@ void KsSpinAlignment_NullTest::other(int* , BelleEvent*, int* ){
 // v1.0.0 : 
 // - first version
 // Dec. 24, 2025
+// v1.0.1 :
+// add continue statement after warning message for K_S decay daughters number not equal to 2
+// the crash is due to gen_hepevt(chg) return nullptr || gen.mother() , add check fix this issue. when apply mc truth matching
