@@ -64,7 +64,7 @@ initialize
 
 #MC or experiment data for procession
 #process_event /group/belle/bdata_b/dstprod/dat/e000069/HadronBJ/0127/continuum/08/HadronBJ-e000069r000823-b20090127_0910.mdst 1000
-process_event /group/belle/bdata_b/mcprod/dat/e000065/evtgen/uds/00/all/0127/continuum/06/evtgen-uds-00-all-e000065r000626-b20090127_0910.mdst 1000
+process_event /group/belle/bdata_b/mcprod/dat/e000065/evtgen/uds/00/all/0127/continuum/06/evtgen-uds-00-all-e000065r000626-b20090127_0910.mdst
 #process_url http://bweb3/montecarlo.php?ex=7&rs=1490&re=1690&ty=evtgen-uds&dt=continuum&bl=caseB&st=20 
 
 

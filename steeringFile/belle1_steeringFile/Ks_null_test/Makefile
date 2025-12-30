@@ -1045,13 +1045,15 @@ include $(BELLE_TOP_DIR)/src/config/Makefile.panther
 
 BELLE_LIB = -lip -lkid -lmdst -lparticle -lhelix -lbenergy -lbelleCLHEP -lip -leid
 PANTHER_LIB = -L$(BELLE_RUN_DIR)/lib/so -lpanther
+NIS_LIB = -L$(BELLE_RUN_DIR)/lib/so -lnisKsFinder
+NEUROBAYES_LIB = -lEG -lNeuroBayesExpertCPP -L$(NEUROBAYES)/lib
 # NEUROBAYES_LIB = -lEG -lNeuroBayesTeacherCPP -L$(NEUROBAYES)/lib
 # EXTRA_LIB =
 PPLUS_LIB = -lpplus
 .SUFFIXES: .c .cc .so
 
-LIBS = -L. $(PANTHER_LIB) $(BELLE_LIB) `root-config --libs` #$(EXTRA_LIB) $(NEUROBAYES_LIB)
-INCS = -I. -I$(MY_TOP_DIR)/include -I$(BELLE_INC_DIR) -I /usr/local/include/boost-1_37 `root-config --cflags` #-I./Experte/src -I$(NEUROBAYES)/include
+LIBS = -L. $(PANTHER_LIB) $(BELLE_LIB) $(NIS_LIB)  `root-config --libs` $(NEUROBAYES_LIB) #$(EXTRA_LIB)
+INCS = -I. -I$(MY_TOP_DIR)/include -I$(BELLE_INC_DIR) -I /usr/local/include/boost-1_37 `root-config --cflags` -I./Experte/src -I$(NEUROBAYES)/include
 
 CC  = gcc
 CXX = g++
