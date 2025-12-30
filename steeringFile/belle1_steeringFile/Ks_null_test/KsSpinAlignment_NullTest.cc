@@ -10,7 +10,7 @@
 #include "particle/utility.h"
 #include "particle/combination.h"
 
-#include "./SpinAlignment.h"
+#include "./KsSpinAlignment_NullTest.h"
 #include "./AnaConsts.h"
 #include <eid/eid.h>
 #include "TTree.h"
@@ -29,6 +29,7 @@
 #include "math.h"
 #include "toolbox/FuncPtr.h"
 #include "TRandom.h"
+#include "nisKsFinder/nisKsFinder.h" 
 
 #include MDST_H
 #include BELLETDF_H
@@ -38,11 +39,16 @@ using namespace std;
 
 /*
 -----------------------------------------
-qqbar(udsc) -> phi+ + anything                             
-         \-> K+ K-                                 
+qqbar(udsc) -> K_S + anything                             
+                \-> pi+ pi-                                 
+measure K_S's spin alignment as null test
 
-version : v2.1.2
-Date    : 2025.12.03
+K_S is spin-0, so spin alignment should be zero
+This serves as a validation of the analysis method
+-----------------------------------------
+
+version : v2.0.0
+Date    : 2025.12.30
 Author  : Zhen Wang
 */
 
@@ -56,7 +62,7 @@ Hep3Vector& retSelf(Hep3Vector& vec)
 };
 
 
-SpinAlignment::SpinAlignment(){
+KsSpinAlignment_NullTest::KsSpinAlignment_NullTest(){
     output_filename=new char[256];
 
     r1.SetSeed(100);
@@ -70,14 +76,14 @@ SpinAlignment::SpinAlignment(){
     return;
 }
 
-void SpinAlignment::init(int *status){
-    cout << "in SpinAlignment::init()" << endl;
+void KsSpinAlignment_NullTest::init(int *status){
+    cout << "in KsSpinAlignment_NullTest::init()" << endl;
     hist_def();
     *status=0;
     return;
 }
 
-void SpinAlignment::begin_run(BelleEvent* evptr, int* status){
+void KsSpinAlignment_NullTest::begin_run(BelleEvent* evptr, int* status){
     // loading calibration constants and lookup tables needed for particle ID ?
     eid::init_data();
     (void)evptr; (void)status;
@@ -109,13 +115,13 @@ void SpinAlignment::begin_run(BelleEvent* evptr, int* status){
 }
 
 
-void SpinAlignment::end_run(BelleEvent* evptr, int* status){
+void KsSpinAlignment_NullTest::end_run(BelleEvent* evptr, int* status){
     (void)evptr; (void)status;
     return; 
 }
 
 
-void SpinAlignment::hist_def(){
+void KsSpinAlignment_NullTest::hist_def(){
     output_file = new TFile(output_filename, "RECREATE");
     tree = new TTree("event", "event"); 
     mctree = new TTree("truth", "truth");
@@ -145,53 +151,56 @@ void SpinAlignment::hist_def(){
     
 
     if (isMC){
-        mctree->Branch("kp_E_cms_truth", &kp_E_cms_truth);
-        mctree->Branch("kp_px_cms_truth", &kp_px_cms_truth);
-        mctree->Branch("kp_py_cms_truth", &kp_py_cms_truth);
-        mctree->Branch("kp_pz_cms_truth", &kp_pz_cms_truth);
-        mctree->Branch("km_E_cms_truth", &km_E_cms_truth);
-        mctree->Branch("km_px_cms_truth", &km_px_cms_truth);
-        mctree->Branch("km_py_cms_truth", &km_py_cms_truth);
-        mctree->Branch("km_pz_cms_truth", &km_pz_cms_truth);
+        mctree->Branch("pip_E_cms_truth", &pip_E_cms_truth);
+        mctree->Branch("pip_px_cms_truth", &pip_px_cms_truth);
+        mctree->Branch("pip_py_cms_truth", &pip_py_cms_truth);
+        mctree->Branch("pip_pz_cms_truth", &pip_pz_cms_truth);
+        mctree->Branch("pim_E_cms_truth", &pim_E_cms_truth);
+        mctree->Branch("pim_px_cms_truth", &pim_px_cms_truth);
+        mctree->Branch("pim_py_cms_truth", &pim_py_cms_truth);
+        mctree->Branch("pim_pz_cms_truth", &pim_pz_cms_truth);
 
         mctree->Branch("thrust_truth", &thrust_truth);
         mctree->Branch("qqbar_axis", &qqbar_axis);
 
-        mctree->Branch("kp_theta", &kp_theta);
-        mctree->Branch("km_theta", &km_theta);
-        mctree->Branch("kp_p_truth", &kp_p_truth);
-        mctree->Branch("km_p_truth", &km_p_truth);
-        mctree->Branch("kp_pt_truth", &kp_pt_truth);
-        mctree->Branch("km_pt_truth", &km_pt_truth);
+        mctree->Branch("pip_theta", &pip_theta);
+        mctree->Branch("pim_theta", &pim_theta);
+        mctree->Branch("pip_p_truth", &pip_p_truth);
+        mctree->Branch("pim_p_truth", &pim_p_truth);
+        mctree->Branch("pip_pt_truth", &pip_pt_truth);
+        mctree->Branch("pim_pt_truth", &pim_pt_truth);
     }
 
     // vector<double> type branches
-    tree->Branch("kp_E_cms", &kp_E_cms);
-    tree->Branch("kp_px_cms", &kp_px_cms);
-    tree->Branch("kp_py_cms", &kp_py_cms);
-    tree->Branch("kp_pz_cms", &kp_pz_cms);
-    tree->Branch("km_E_cms", &km_E_cms);
-    tree->Branch("km_px_cms", &km_px_cms);
-    tree->Branch("km_py_cms", &km_py_cms);
-    tree->Branch("km_pz_cms", &km_pz_cms);
+    tree->Branch("pip_E_cms", &pip_E_cms);
+    tree->Branch("pip_px_cms", &pip_px_cms);
+    tree->Branch("pip_py_cms", &pip_py_cms);
+    tree->Branch("pip_pz_cms", &pip_pz_cms);
+    tree->Branch("pim_E_cms", &pim_E_cms);
+    tree->Branch("pim_px_cms", &pim_px_cms);
+    tree->Branch("pim_py_cms", &pim_py_cms);
+    tree->Branch("pim_pz_cms", &pim_pz_cms);
 
-    tree->Branch("kp_p", &kp_p);
-    tree->Branch("km_p", &km_p);
+    tree->Branch("pip_p", &pip_p);
+    tree->Branch("pim_p", &pim_p);
+
+    //tree->Branch("ks_m_combine", &ks_m_combine);
+    //tree->Branch("ks_m_read", &ks_m_read);
 
     if(isMC){
-        tree->Branch("kp_E_cms_gen", &kp_E_cms_gen);
-        tree->Branch("kp_px_cms_gen", &kp_px_cms_gen);
-        tree->Branch("kp_py_cms_gen", &kp_py_cms_gen);
-        tree->Branch("kp_pz_cms_gen", &kp_pz_cms_gen);
-        tree->Branch("km_E_cms_gen", &km_E_cms_gen);
-        tree->Branch("km_px_cms_gen", &km_px_cms_gen);
-        tree->Branch("km_py_cms_gen", &km_py_cms_gen);
-        tree->Branch("km_pz_cms_gen", &km_pz_cms_gen);
+        tree->Branch("pip_E_cms_gen", &pip_E_cms_gen);
+        tree->Branch("pip_px_cms_gen", &pip_px_cms_gen);
+        tree->Branch("pip_py_cms_gen", &pip_py_cms_gen);
+        tree->Branch("pip_pz_cms_gen", &pip_pz_cms_gen);
+        tree->Branch("pim_E_cms_gen", &pim_E_cms_gen);
+        tree->Branch("pim_px_cms_gen", &pim_px_cms_gen);
+        tree->Branch("pim_py_cms_gen", &pim_py_cms_gen);
+        tree->Branch("pim_pz_cms_gen", &pim_pz_cms_gen);
 
-        tree->Branch("kp_isSignal", &kp_isSignal);
-        tree->Branch("km_isSignal", &km_isSignal);
+        tree->Branch("pip_isSignal", &pip_isSignal);
+        tree->Branch("pim_isSignal", &pim_isSignal);
 
-        tree->Branch("n_phi_truth", &n_phi_truth);
+        tree->Branch("n_ks_truth", &n_ks_truth);
 
         tree->Branch("thrust_truth", &thrust_truth);
         tree->Branch("qqbar_axis", &qqbar_axis);
@@ -200,12 +209,14 @@ void SpinAlignment::hist_def(){
 }
 
 
-void SpinAlignment::event(BelleEvent* evptr, int* status){
+void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
     (void)evptr; (void)status;
 
     int  expNo=Belle_event_Manager::get_manager().begin()->ExpNo();
     int  evtNo=Belle_event_Manager::get_manager().begin()->EvtNo();
     int  runNo=Belle_event_Manager::get_manager().begin()->RunNo();
+
+    const HepPoint3D ip_position = IpProfile::e_position();
 
     Evtcls_hadronic_flag_Manager& ClassMgr = Evtcls_hadronic_flag_Manager::get_manager();
 
@@ -241,87 +252,43 @@ void SpinAlignment::event(BelleEvent* evptr, int* status){
     particles_p4_cms.clear();
 
     // ----------------------------------------------------------------------------------
-    // same to EventClassify.cc to keep thrust calculation consistent
-    /*
-    same to later implementation 
-    for(Mdst_charged_Manager::iterator ch_it=charged_mgr.begin(); ch_it!=charged_mgr.end(); ch_it++){
-        Mdst_charged Charged = *ch_it;
-        Mdst_trk& Trk = Charged.trk();
-        Mdst_trk_fit& Trkfit = Trk.mhyp(2);
-        Hep3Vector P ( Charged.px(), Charged.py(), Charged.pz() ); 
-        float dr       = Trkfit.helix(0);
-        float dz       = Trkfit.helix(3);
 
-        if(P.perp() >= 0.1 && abs(dr) <2 && abs(dz) <4){
+
+    Evtcls_hadron_charged_Manager& hadron_chg_mgr = Evtcls_hadron_charged_Manager::get_manager();
+    for(Evtcls_hadron_charged_Manager::iterator it = hadron_chg_mgr.begin();
+        it != hadron_chg_mgr.end(); it++){
+
+        if (!it->charged()) continue;  // Check if charged is valid
+
+        const Mdst_charged& Charged = it->charged();
+        Hep3Vector P(Charged.px(), Charged.py(), Charged.pz());
         
-        double E = sqrt(P.mag2() + xmass[2]*xmass[2]);  // pion mass hypothesis 
+        double E = sqrt(P.mag2() + xmass[2]*xmass[2]);
         HepLorentzVector P_cms(P,E);
         P_cms.boost(kinematics.CMBoost);
-
-        //if (E < 0.1) 
-        //    continue;
+        
         particles_p3_cms.push_back(P_cms.vect());
         particles_p4_cms.push_back(P_cms);
-
-        }
     }
 
-    for(Mdst_gamma_Manager::iterator gam = gamma_mgr.begin(); gam != gamma_mgr.end(); gam++){
-        Mdst_gamma& Gamma = *gam;           
-        Mdst_ecl& Ecl = Gamma.ecl();
-        Hep3Vector P ( Gamma.px(), Gamma.py(), Gamma.pz() ); 
-        // Define momentum vector
-        if(Ecl.quality() ==0 && P.mag() >= 0.1){
-            double E = P.mag();
-            HepLorentzVector vec_p4(P, E);
-            vec_p4.boost(kinematics.CMBoost);
-            particles_p3_cms.push_back(vec_p4.vect());
-            particles_p4_cms.push_back(vec_p4);
-        }
+    // 对 gamma 也类似
+    Evtcls_hadron_neutral_Manager& hadron_neu_mgr = Evtcls_hadron_neutral_Manager::get_manager();
+
+    for(Evtcls_hadron_neutral_Manager::iterator it = hadron_neu_mgr.begin();
+        it != hadron_neu_mgr.end(); it++){
+        
+        if (!it->gamma()) continue;  // Check if gamma is valid
+        
+        const Mdst_gamma& Gamma = it->gamma();
+        Hep3Vector P(Gamma.px(), Gamma.py(), Gamma.pz());
+        
+        double E = P.mag();
+        HepLorentzVector vec_p4(P, E);
+        vec_p4.boost(kinematics.CMBoost);
+        
+        particles_p3_cms.push_back(vec_p4.vect());
+        particles_p4_cms.push_back(vec_p4);
     }
-    
-    Hep3Vector thr_test = thrust(particles_p3_cms.begin(), particles_p3_cms.end(), retSelf);
-    double thrustA = thr_test.mag();
-
-    particles_p3_cms.clear();
-    particles_p4_cms.clear();
-    */
-
-Evtcls_hadron_charged_Manager& hadron_chg_mgr = Evtcls_hadron_charged_Manager::get_manager();
-for(Evtcls_hadron_charged_Manager::iterator it = hadron_chg_mgr.begin();
-    it != hadron_chg_mgr.end(); it++){
-
-    if (!it->charged()) continue;  // Check if charged is valid
-
-    const Mdst_charged& Charged = it->charged();
-    Hep3Vector P(Charged.px(), Charged.py(), Charged.pz());
-    
-    double E = sqrt(P.mag2() + xmass[2]*xmass[2]);
-    HepLorentzVector P_cms(P,E);
-    P_cms.boost(kinematics.CMBoost);
-    
-    particles_p3_cms.push_back(P_cms.vect());
-    particles_p4_cms.push_back(P_cms);
-}
-
-// 对 gamma 也类似
-Evtcls_hadron_neutral_Manager& hadron_neu_mgr = Evtcls_hadron_neutral_Manager::get_manager();
-
-for(Evtcls_hadron_neutral_Manager::iterator it = hadron_neu_mgr.begin();
-    it != hadron_neu_mgr.end(); it++){
-    
-    if (!it->gamma()) continue;  // Check if gamma is valid
-    
-    const Mdst_gamma& Gamma = it->gamma();
-    Hep3Vector P(Gamma.px(), Gamma.py(), Gamma.pz());
-    
-    double E = P.mag();
-    HepLorentzVector vec_p4(P, E);
-    vec_p4.boost(kinematics.CMBoost);
-    
-    particles_p3_cms.push_back(vec_p4.vect());
-    particles_p4_cms.push_back(vec_p4);
-}
 
     //Hep3Vector thr = thrust(particles_p3_cms.begin(), particles_p3_cms.end(), retSelf);
     Hep3Vector thr = thrust(particles_p3_cms.begin(), particles_p3_cms.end(), SelfFunc(Hep3Vector()));
@@ -347,176 +314,174 @@ for(Evtcls_hadron_neutral_Manager::iterator it = hadron_neu_mgr.begin();
     //cout << "read: " << Thrust << " calc: " << ThrParam << endl; 
     // ----------------------------------------------------------------------------------
     
-
-    // start our selection
-    Vp3 hadrons_p3_cms;
-    Vp4 hadrons_p4_cms;
-    hadrons_p3_cms.clear();
-    hadrons_p4_cms.clear();
-    kp_E_cms.clear();
-    kp_px_cms.clear();
-    kp_py_cms.clear();
-    kp_pz_cms.clear();
-    km_E_cms.clear();
-    km_px_cms.clear();
-    km_py_cms.clear();
-    km_pz_cms.clear();
-
-    kp_p.clear();
-    km_p.clear();
-
-    if (isMC){
-        kp_isSignal.clear();
-        km_isSignal.clear();
-
-        kp_E_cms_gen.clear();
-        kp_px_cms_gen.clear();
-        kp_py_cms_gen.clear();
-        kp_pz_cms_gen.clear();
-        km_E_cms_gen.clear();
-        km_px_cms_gen.clear();
-        km_py_cms_gen.clear();
-        km_pz_cms_gen.clear();
-
+    pip_E_cms.clear(); pip_px_cms.clear(); pip_py_cms.clear(); pip_pz_cms.clear();
+    pim_E_cms.clear(); pim_px_cms.clear(); pim_py_cms.clear(); pim_pz_cms.clear();
+    pip_p.clear(); pim_p.clear();
+    //ks_m_combine.clear(); ks_m_read.clear();
+    if (isMC) {
+        pip_isSignal.clear(); pim_isSignal.clear();
+        pip_E_cms_gen.clear(); pip_px_cms_gen.clear(); pip_py_cms_gen.clear(); pip_pz_cms_gen.clear();
+        pim_E_cms_gen.clear(); pim_px_cms_gen.clear(); pim_py_cms_gen.clear(); pim_pz_cms_gen.clear();
     }
 
-    for(Mdst_charged_Manager::iterator ch_it=charged_mgr.begin(); ch_it!=charged_mgr.end(); ch_it++){
-        const Mdst_charged &chg = *ch_it;
+    // using findKs to select good Ks from candidate in mdst_vee2 
+    // see /home/belle/liyb/work/published/Xic2930/mode3/myutils.cc
+    Mdst_vee2_Manager& VeeMgr = Mdst_vee2_Manager::get_manager();
 
-        Hep3Vector vec_p3(chg.p(0), chg.p(1), chg.p(2));
+    std::vector<Particle> kslist;
 
-        double dr, dz, refitPx, refitPy, refitPz;
-        getDrDz(ch_it, 0, dr, dz, refitPx, refitPy, refitPz);
+    for(std::vector<Mdst_vee2>::const_iterator iv=VeeMgr.begin(); iv!=VeeMgr.end(); iv++) {
+        // Is it a K_short, or another V-particle ?
+        if (iv->kind() != 1) continue;
+        // Check for daughters
+        if(!iv->chgd(0) || !iv->chgd(1)) continue;
+        Particle Kshort(*iv);
 
-        if(fabs(dr) > cuts::vertexR || fabs(dz) > cuts::vertexZ) 
-            continue;
-        double pt = vec_p3.perp();
-        if (pt < cuts::trkPt) 
-            continue;
-        //if (vec_p3.mag() < cuts::trkP)
-        //    continue;
-        double cosTheta = cos(vec_p3.theta());
-        if (cosTheta < cuts::trk_cosTheta_min || cosTheta > cuts::trk_cosTheta_max)
-            continue;
+        // use nisKshort finder to check K-short quality
+        nisKsFinder ksnb;
+        ksnb.candidates(*iv, ip_position);
+        int goodKsFlag = ksnb.standard();
 
-        // identification
-        bool isLepton = false;
-        int charge = chg.charge();
-        int massHyp = 2;
+        if(goodKsFlag != 1) continue;                
 
-        eid sel_e(*ch_it);  
-        atc_pid selKPi(3,1,5,3,2);  //K/pi separation
-        atc_pid selPiP(3,1,5,2,4); 
-        atc_pid selKP(3,1,5,3,4);
-        double mu_id = 0;
-        Muid_mdst muID(*ch_it);
-        if (muID.Chi_2() >0) 
-            mu_id = muID.Muon_likelihood();
+        //saveKsInfo(Kshort,ksnb.fl());
+        kslist.push_back(Kshort);
+    }
 
-        double atcKPi=selKPi.prob(*ch_it);
-        double atcKP=selKP.prob(*ch_it);
-        double atcPiP=selPiP.prob(*ch_it);
+      // 新增：保存Ks顶点坐标
+    std::vector<double> ks_vx, ks_vy, ks_vz;
 
-        float e_cut=0.85;
-        float mu_cut=0.9;
-        double e_id=sel_e.prob(3,-1,5);
+    for (size_t i = 0; i < kslist.size(); ++i) {
+        const Particle& Kshort = kslist[i];
+        // 保存顶点坐标
+        ks_vx.push_back(Kshort.momentum().decayVertex().x());
+        ks_vy.push_back(Kshort.momentum().decayVertex().y());
+        ks_vz.push_back(Kshort.momentum().decayVertex().z());
 
-        if(mu_id > mu_cut) {
-            massHyp = 1; // muon
-            isLepton = true;
+        // save info of Ks decay daughters pi+ pi-
+        const Mdst_charged& dau1 = Kshort.child(0).mdstCharged();
+        const Mdst_charged& dau2 = Kshort.child(1).mdstCharged();
+
+        Hep3Vector p1(dau1.px(), dau1.py(), dau1.pz());
+        Hep3Vector p2(dau2.px(), dau2.py(), dau2.pz());
+        int q1 = dau1.charge();
+        int q2 = dau2.charge();
+
+        /* this retrieve the 4-p without vertex fit correction
+        double m_pi = xmass[2];
+        double E1 = sqrt(p1.mag2() + m_pi*m_pi);
+        double E2 = sqrt(p2.mag2() + m_pi*m_pi);
+        HepLorentzVector p4_1(p1, E1);
+        HepLorentzVector p4_2(p2, E2);
+        */
+
+        HepLorentzVector p4_1 = Kshort.child(0).momentum().p();
+        HepLorentzVector p4_2 = Kshort.child(1).momentum().p(); 
+        p4_1.boost(kinematics.CMBoost);
+        p4_2.boost(kinematics.CMBoost);
+
+        // 按电荷分配pi+ pi-
+        if (q1 == 1) {
+            pip_E_cms.push_back(p4_1.e());
+            pip_px_cms.push_back(p4_1.px());
+            pip_py_cms.push_back(p4_1.py());
+            pip_pz_cms.push_back(p4_1.pz());
+            pip_p.push_back(p1.mag());
+        } else if (q1 == -1) {
+            pim_E_cms.push_back(p4_1.e());
+            pim_px_cms.push_back(p4_1.px());
+            pim_py_cms.push_back(p4_1.py());
+            pim_pz_cms.push_back(p4_1.pz());
+            pim_p.push_back(p1.mag());
         }
-        else if(e_id > e_cut && mu_id < mu_cut) {
-            massHyp = 0; // electron
-            isLepton = true;
-        }
-
-        if(!isLepton) {
-            if(atcKPi > 0.6 && atcKP > 0.2) {
-                massHyp = 3; // kaon
-            }
-            else if(atcKPi < 0.6 && atcPiP > 0.2) {
-                massHyp = 2; // pion
-            }
-            else if(atcKP < 0.2 && atcPiP < 0.2) {
-                massHyp = 4; // proton
-            }
-        }
-
-        // ---------------------------------------------------------
-        // match MC truth and retieve mother particle info
-        if (isMC == 1 && massHyp == 3) {
-            const Gen_hepevt &gen = gen_level(get_hepevt(chg));
-            Gen_hepevt &mother = gen.mother();
-            int mc_mother_pdg = mother.idhep();
-            int mc_pdg = gen.idhep();
-
-            HepLorentzVector p4_truth(gen.PX(), gen.PY(), gen.PZ(), gen.E());
-            p4_truth.boost(kinematics.CMBoost);
-
-            bool isKaon = false;
-            bool fromPhi = false;
-
-            if (abs(mc_mother_pdg) == 333)
-                fromPhi = true;
-
-            if (mc_pdg * charge == 321)
-                isKaon = true;
-
-            if (charge == 1) {
-                if (isKaon && fromPhi) {
-                    kp_isSignal.push_back(true);
-                    kp_E_cms_gen.push_back(p4_truth.e());
-                    kp_px_cms_gen.push_back(p4_truth.px());
-                    kp_py_cms_gen.push_back(p4_truth.py());
-                    kp_pz_cms_gen.push_back(p4_truth.pz());
-                } else {
-                    kp_isSignal.push_back(false);
-                }
-            }
-            else if(charge == -1)  {
-                if (isKaon && fromPhi) {
-                    km_isSignal.push_back(true);
-                    km_E_cms_gen.push_back(p4_truth.e());
-                    km_px_cms_gen.push_back(p4_truth.px());
-                    km_py_cms_gen.push_back(p4_truth.py());
-                    km_pz_cms_gen.push_back(p4_truth.pz());
-                } else {
-                    km_isSignal.push_back(false);
-                }
-            }
+        if (q2 == 1) {
+            pip_E_cms.push_back(p4_2.e());
+            pip_px_cms.push_back(p4_2.px());
+            pip_py_cms.push_back(p4_2.py());
+            pip_pz_cms.push_back(p4_2.pz());
+            pip_p.push_back(p2.mag());
+        } else if (q2 == -1) {
+            pim_E_cms.push_back(p4_2.e());
+            pim_px_cms.push_back(p4_2.px());
+            pim_py_cms.push_back(p4_2.py());
+            pim_pz_cms.push_back(p4_2.pz());
+            pim_p.push_back(p2.mag());
         }
         
-        // ---------------------------------------------------------
-        // store track kinematic variables
-        double E = sqrt(vec_p3.mag2() + xmass[massHyp]*xmass[massHyp]); 
-        HepLorentzVector p4_boosted(vec_p3, E);
-        p4_boosted.boost(kinematics.CMBoost);
+        // ----- test coordinate Ks reconstruction -----
+        /* the difference is less than 10-3 GeV
+        HepLorentzVector p4_combine = p4_1 + p4_2;
+        HepLorentzVector p4_Ks = Kshort.momentum().p();
+        p4_Ks.boost(kinematics.CMBoost);
+        cout << "Ks mass from mdst_vee2: " << p4_Ks.m() << ", mass from combine daughters: " << p4_combine.m() << endl;
+        ks_m_combine.push_back(p4_combine.m());
+        ks_m_read.push_back(p4_Ks.m()); 
+        */
 
-        if (massHyp == 3){
-            if(charge == 1) {
-                kp_E_cms.push_back(p4_boosted.e());
-                kp_px_cms.push_back(p4_boosted.px());
-                kp_py_cms.push_back(p4_boosted.py());
-                kp_pz_cms.push_back(p4_boosted.pz());
-                kp_p.push_back(vec_p3.mag());
+        // ----------- save MC generate level info -----------
+        if (isMC) {
+            // dau1
+            if (get_hepevt(dau1)) {
+                const Gen_hepevt& gen = gen_level(get_hepevt(dau1));
+                if (gen.mother() && abs(gen.mother().idhep()) == 310 && abs(gen.idhep()) == 211) {
+                    HepLorentzVector p4_truth(gen.PX(), gen.PY(), gen.PZ(), gen.E());
+                    p4_truth.boost(kinematics.CMBoost);
+                    if (q1 == 1) {
+                        pip_E_cms_gen.push_back(p4_truth.e());
+                        pip_px_cms_gen.push_back(p4_truth.px());
+                        pip_py_cms_gen.push_back(p4_truth.py());
+                        pip_pz_cms_gen.push_back(p4_truth.pz());
+                        pip_isSignal.push_back(true);
+                    } else if (q1 == -1) {
+                        pim_E_cms_gen.push_back(p4_truth.e());
+                        pim_px_cms_gen.push_back(p4_truth.px());
+                        pim_py_cms_gen.push_back(p4_truth.py());
+                        pim_pz_cms_gen.push_back(p4_truth.pz());
+                        pim_isSignal.push_back(true);
+                    }
+                } else {
+                    if (q1 == 1) pip_isSignal.push_back(false);
+                    else if (q1 == -1) pim_isSignal.push_back(false);
+                }
+            } else {
+                if (q1 == 1) pip_isSignal.push_back(false);
+                else if (q1 == -1) pip_isSignal.push_back(false);
             }
-            else if(charge == -1)  {
-                km_E_cms.push_back(p4_boosted.e());
-                km_px_cms.push_back(p4_boosted.px());
-                km_py_cms.push_back(p4_boosted.py());
-                km_pz_cms.push_back(p4_boosted.pz());
-                km_p.push_back(vec_p3.mag());
+            // dau2
+            if (get_hepevt(dau2)) {
+                const Gen_hepevt& gen = gen_level(get_hepevt(dau2));
+                if (gen.mother() && abs(gen.mother().idhep()) == 310 && abs(gen.idhep()) == 211) {
+                    HepLorentzVector p4_truth(gen.PX(), gen.PY(), gen.PZ(), gen.E());
+                    p4_truth.boost(kinematics.CMBoost);
+                    if (q2 == 1) {
+                        pip_E_cms_gen.push_back(p4_truth.e());
+                        pip_px_cms_gen.push_back(p4_truth.px());
+                        pip_py_cms_gen.push_back(p4_truth.py());
+                        pip_pz_cms_gen.push_back(p4_truth.pz());
+                        pip_isSignal.push_back(true);
+                    } else if (q2 == -1) {
+                        pim_E_cms_gen.push_back(p4_truth.e());
+                        pim_px_cms_gen.push_back(p4_truth.px());
+                        pim_py_cms_gen.push_back(p4_truth.py());
+                        pim_pz_cms_gen.push_back(p4_truth.pz());
+                        pim_isSignal.push_back(true);
+                    }
+                } else {
+                    if (q2 == 1) pip_isSignal.push_back(false);
+                    else if (q2 == -1) pim_isSignal.push_back(false);
+                }
+            } else {
+                if (q2 == 1) pip_isSignal.push_back(false);
+                else if (q2 == -1) pip_isSignal.push_back(false);
             }
         }
-
-        hadrons_p3_cms.push_back(p4_boosted.vect());
-        hadrons_p4_cms.push_back(p4_boosted);
-
+        // ------------------------------------------------------
     }
 
-    // ensure there has at least a K+ K- pair
-    if (kp_px_cms.size() * km_px_cms.size() ==0) return;  
-    
+ 
+    // require at least one K_S candidate
+    if (pip_px_cms.size() * pim_px_cms.size() == 0) return;
+
     m_info.evtNo = evtNo;
     m_info.runNo = runNo;
     m_info.expNo = expNo;
@@ -538,25 +503,25 @@ for(Evtcls_hadron_neutral_Manager::iterator it = hadron_neu_mgr.begin();
 }
 
 
-void SpinAlignment::readMC()
+void KsSpinAlignment_NullTest::readMC()
 {
     Vp3 allParticlesCMS_truth;
 
     allParticlesCMS_truth.clear();
-    kp_E_cms_truth.clear();
-    kp_px_cms_truth.clear();
-    kp_py_cms_truth.clear();
-    kp_pz_cms_truth.clear();
-    km_E_cms_truth.clear();
-    km_px_cms_truth.clear();
-    km_py_cms_truth.clear();
-    km_pz_cms_truth.clear();
-    kp_theta.clear();
-    km_theta.clear();
-    kp_p_truth.clear();
-    km_p_truth.clear();
-    kp_pt_truth.clear();
-    km_pt_truth.clear();
+    pip_E_cms_truth.clear();
+    pip_px_cms_truth.clear();
+    pip_py_cms_truth.clear();
+    pip_pz_cms_truth.clear();
+    pim_E_cms_truth.clear();
+    pim_px_cms_truth.clear();
+    pim_py_cms_truth.clear();
+    pim_pz_cms_truth.clear();
+    pip_theta.clear();
+    pim_theta.clear();
+    pip_p_truth.clear();
+    pim_p_truth.clear();
+    pip_pt_truth.clear();
+    pim_pt_truth.clear();
 
     int Nquark = 0;
     HepLorentzVector q_momentum(0.,0.,0.,0.);
@@ -570,12 +535,13 @@ void SpinAlignment::readMC()
         // for daughter particle retrieval
         Gen_hepevt_Manager& gen_hepevt_mgr = Gen_hepevt_Manager::get_manager();
 
-        if (pid == 333)
+        if (pid == 310)  // K_S (PDG code 310)
         {
             int ndaug = (gen_it->daLast() - gen_it->daFirst()) + 1;
-            //if (ndaug != 2) continue; // phi -> K+ K- only
+            //if (ndaug != 2) continue; // K_S -> pi+ pi- only
             if (ndaug != 2){
-                cout << "Warning: phi meson decay daughters number is " << ndaug << endl;
+                cout << "Warning: K_S decay daughters number is " << ndaug << endl;
+                continue;
             }
 
             for (int i = 0; i < ndaug; ++i){
@@ -583,7 +549,8 @@ void SpinAlignment::readMC()
                 Gen_hepevt& daughter = gen_hepevt_mgr(ID);
                 
                 int daughter_pid = daughter.idhep();
-                if (abs(daughter_pid) != 321) continue; // only K+ and K-
+                //cout << "daughter: "<< i <<" pid: " << daughter_pid << endl;
+                if (abs(daughter_pid) != 211) continue; // only pi+ and pi-
                 
                 HepLorentzVector daughter_v4 (daughter.PX(), daughter.PY(), daughter.PZ(), daughter.E());
                 double theta_lab = daughter_v4.vect().theta()*180.0/acos(-1.0);
@@ -591,23 +558,23 @@ void SpinAlignment::readMC()
                 double pt = daughter_v4.vect().perp();
                 daughter_v4.boost(kinematics.CMBoost);
 
-                if (daughter_pid == 321){
-                    kp_E_cms_truth.push_back(daughter_v4.e());
-                    kp_px_cms_truth.push_back(daughter_v4.px());
-                    kp_py_cms_truth.push_back(daughter_v4.py());
-                    kp_pz_cms_truth.push_back(daughter_v4.pz());
-                    kp_theta.push_back(theta_lab);
-                    kp_p_truth.push_back(p);
-                    kp_pt_truth.push_back(pt);
+                if (daughter_pid == 211){  // pi+
+                    pip_E_cms_truth.push_back(daughter_v4.e());
+                    pip_px_cms_truth.push_back(daughter_v4.px());
+                    pip_py_cms_truth.push_back(daughter_v4.py());
+                    pip_pz_cms_truth.push_back(daughter_v4.pz());
+                    pip_theta.push_back(theta_lab);
+                    pip_p_truth.push_back(p);
+                    pip_pt_truth.push_back(pt);
                 }
-                else if (daughter_pid == -321){
-                    km_E_cms_truth.push_back(daughter_v4.e());
-                    km_px_cms_truth.push_back(daughter_v4.px());
-                    km_py_cms_truth.push_back(daughter_v4.py());
-                    km_pz_cms_truth.push_back(daughter_v4.pz());
-                    km_theta.push_back(theta_lab);
-                    km_p_truth.push_back(p);
-                    km_pt_truth.push_back(pt);
+                else if (daughter_pid == -211){  // pi-
+                    pim_E_cms_truth.push_back(daughter_v4.e());
+                    pim_px_cms_truth.push_back(daughter_v4.px());
+                    pim_py_cms_truth.push_back(daughter_v4.py());
+                    pim_pz_cms_truth.push_back(daughter_v4.pz());
+                    pim_theta.push_back(theta_lab);
+                    pim_p_truth.push_back(p);
+                    pim_pt_truth.push_back(pt);
                 }
             }
         }
@@ -623,7 +590,7 @@ void SpinAlignment::readMC()
             //    continue;
 
             //if (gen_it->E() > 0.1) { // same cut as in reconstructed level
-            //    allParticlesCMS_truth.push_back(v4tmp.vect());
+            allParticlesCMS_truth.push_back(v4tmp.vect());
             //}
         }
 
@@ -653,8 +620,8 @@ void SpinAlignment::readMC()
         qqbar_axis.push_back(qqbar_vec[i]);
     }
 
-    n_phi_truth = kp_E_cms_truth.size();
-    if (n_phi_truth < 1) return; // ensure there is at least a phi meson in truth level
+    n_ks_truth = pip_E_cms_truth.size();
+    if (n_ks_truth < 1) return; // ensure there is at least a K_S in truth level
 
     mctree->Fill();
 
@@ -662,19 +629,19 @@ void SpinAlignment::readMC()
 }
 
 
-void SpinAlignment::disp_stat(const char*){
+void KsSpinAlignment_NullTest::disp_stat(const char*){
     return;
 } 
 
 
-void SpinAlignment::term(){
+void KsSpinAlignment_NullTest::term(){
     output_file->Write();
     output_file->Close();
     return;
 }
 
 
-std::pair<double, double> SpinAlignment::calculateHeavyJetMassEnergy(const Vp4& particles, const Hep3Vector& thrustAxis) {
+std::pair<double, double> KsSpinAlignment_NullTest::calculateHeavyJetMassEnergy(const Vp4& particles, const Hep3Vector& thrustAxis) {
     HepLorentzVector jet1, jet2;
 
     // Split particles into two jets based on their projection onto the thrust axis
@@ -702,7 +669,7 @@ std::pair<double, double> SpinAlignment::calculateHeavyJetMassEnergy(const Vp4& 
 }
 
 
-std::pair<double, double> SpinAlignment::calculateSphericityAplanarity(const std::vector<HepLorentzVector>& particles) {
+std::pair<double, double> KsSpinAlignment_NullTest::calculateSphericityAplanarity(const std::vector<HepLorentzVector>& particles) {
     // Initialize the momentum tensor
     double M[3][3] = {0};
 
@@ -786,7 +753,7 @@ std::pair<double, double> SpinAlignment::calculateSphericityAplanarity(const std
     return std::make_pair(sphericity, aplanarity);
 }
 
- void SpinAlignment::getDrDz(Mdst_charged_Manager::iterator chr_it, int masshyp, double& dr, double& dz, double& refitPx, double& refitPy, double& refitPz){
+ void KsSpinAlignment_NullTest::getDrDz(Mdst_charged_Manager::iterator chr_it, int masshyp, double& dr, double& dz, double& refitPx, double& refitPy, double& refitPz){
     Mdst_trk& mdsttrk = chr_it->trk();
     Mdst_trk_fit &mdsttrkfit=mdsttrk.mhyp(masshyp);
     HepPoint3D pivot(mdsttrkfit.pivot_x(),mdsttrkfit.pivot_y(),mdsttrkfit.pivot_z());
@@ -828,7 +795,7 @@ std::pair<double, double> SpinAlignment::calculateSphericityAplanarity(const std
 }
 
 
-void SpinAlignment::other(int* , BelleEvent*, int* ){
+void KsSpinAlignment_NullTest::other(int* , BelleEvent*, int* ){
     return;
 }
 
@@ -838,16 +805,12 @@ void SpinAlignment::other(int* , BelleEvent*, int* ){
 
 
 // version log 
-// v2.0.1 : 
-// add MC truth var for the track if in barrel rapidity region
-// Nov 25 2025, Zhen Wang
-
-// v2.1.0 :
-// use hadronB ect flag and correct thrust calculation
-// Dec 01 2025, Zhen Wang
-
-// v2.1.1 :
-// Not apply track momentum cut, and save it
-
-// v2.1.2 :
-// Save truth level kaon 's p, pt
+// v1.0.0 : 
+// - first version
+// Dec. 24, 2025
+// v1.0.1 :
+// add continue statement after warning message for K_S decay daughters number not equal to 2
+// the crash is due to gen_hepevt(chg) return nullptr || gen.mother() , add check fix this issue. when apply mc truth matching
+// v2.0.0 :
+// recontruct Ks using official goodKs selection ; and fixed little bug in save thrust truth in readMC()
+// Dec. 30, 2025

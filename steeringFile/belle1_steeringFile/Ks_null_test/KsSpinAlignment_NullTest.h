@@ -34,10 +34,10 @@ typedef std::vector<HepLorentzVector> Vp4;
 typedef std::vector<Hep3Vector> Vp3;
 typedef std::vector<Particle> VParticle;
 
-class SpinAlignment : public Module{
+class KsSpinAlignment_NullTest : public Module{
     public:
-        SpinAlignment();
-        ~SpinAlignment() {}
+        KsSpinAlignment_NullTest();
+        ~KsSpinAlignment_NullTest() {}
         void init(int *dummy);
         void begin_run(BelleEvent* evptr, int* status);
         void end_run(BelleEvent* evptr, int* status);
@@ -70,7 +70,7 @@ class SpinAlignment : public Module{
         double her_e;
         double x_angle;
 
-        double n_phi_truth; // added for truth phi count
+        double n_ks_truth; // added for truth K_S count
 
         struct var_collection{
             int evtNo;
@@ -115,52 +115,55 @@ class SpinAlignment : public Module{
             double sqrts;
         } kinematics;
 
-        Vdouble kp_E_cms;
-        Vdouble kp_px_cms;
-        Vdouble kp_py_cms;
-        Vdouble kp_pz_cms;
-        Vdouble km_E_cms;
-        Vdouble km_px_cms;
-        Vdouble km_py_cms;
-        Vdouble km_pz_cms;
-        Vdouble kp_p;
-        Vdouble km_p;
+        Vdouble pip_E_cms;
+        Vdouble pip_px_cms;
+        Vdouble pip_py_cms;
+        Vdouble pip_pz_cms;
+        Vdouble pim_E_cms;
+        Vdouble pim_px_cms;
+        Vdouble pim_py_cms;
+        Vdouble pim_pz_cms;
+        Vdouble pip_p;
+        Vdouble pim_p;
 
-        Vbool kp_isSignal;
-        Vbool km_isSignal;
+        Vdouble ks_m_combine;
+        Vdouble ks_m_read;
+        
+        Vbool pip_isSignal;
+        Vbool pim_isSignal;
 
-        Vdouble kp_E_cms_gen;
-        Vdouble kp_px_cms_gen;
-        Vdouble kp_py_cms_gen;
-        Vdouble kp_pz_cms_gen;
-        Vdouble km_E_cms_gen;
-        Vdouble km_px_cms_gen;
-        Vdouble km_py_cms_gen;
-        Vdouble km_pz_cms_gen;
+        Vdouble pip_E_cms_gen;
+        Vdouble pip_px_cms_gen;
+        Vdouble pip_py_cms_gen;
+        Vdouble pip_pz_cms_gen;
+        Vdouble pim_E_cms_gen;
+        Vdouble pim_px_cms_gen;
+        Vdouble pim_py_cms_gen;
+        Vdouble pim_pz_cms_gen;
 
-        Vdouble kp_E_cms_truth;
-        Vdouble kp_px_cms_truth;
-        Vdouble kp_py_cms_truth;
-        Vdouble kp_pz_cms_truth;
-        Vdouble km_E_cms_truth;
-        Vdouble km_px_cms_truth;
-        Vdouble km_py_cms_truth;
-        Vdouble km_pz_cms_truth;
+        Vdouble pip_E_cms_truth;
+        Vdouble pip_px_cms_truth;
+        Vdouble pip_py_cms_truth;
+        Vdouble pip_pz_cms_truth;
+        Vdouble pim_E_cms_truth;
+        Vdouble pim_px_cms_truth;
+        Vdouble pim_py_cms_truth;
+        Vdouble pim_pz_cms_truth;
 
-        Vdouble kp_theta;
-        Vdouble km_theta;
-        Vdouble kp_p_truth;
-        Vdouble km_p_truth;
-        Vdouble kp_pt_truth;
-        Vdouble km_pt_truth;                    
+        Vdouble pip_theta;
+        Vdouble pim_theta;
+        Vdouble pip_p_truth;
+        Vdouble pim_p_truth;
+        Vdouble pip_pt_truth;
+        Vdouble pim_pt_truth;                    
 
         bool isMC;
 };
 
 
-extern "C" Module_descr *mdcl_SpinAlignment() {
-    SpinAlignment *module = new SpinAlignment;
-    Module_descr *dscr = new Module_descr( "SpinAlignment", module );
+extern "C" Module_descr *mdcl_KsSpinAlignment_NullTest() {
+    KsSpinAlignment_NullTest *module = new KsSpinAlignment_NullTest;
+    Module_descr *dscr = new Module_descr( "KsSpinAlignment_NullTest", module );
     dscr->define_param( "output_filename", "output root file name",255 ,(char*)module->output_filename );
     return dscr;
 }
