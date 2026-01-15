@@ -72,6 +72,12 @@ class KsSpinAlignment_NullTest : public Module{
 
         double n_ks_truth; // added for truth K_S count
 
+        int total_ks_candidates;
+int total_after_pt;
+int total_after_cosTheta;
+int total_after_lepton;
+int total_after_pid;
+
         struct var_collection{
             int evtNo;
             int runNo;

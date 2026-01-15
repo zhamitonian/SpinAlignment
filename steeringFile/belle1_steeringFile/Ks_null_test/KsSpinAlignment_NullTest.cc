@@ -47,8 +47,8 @@ K_S is spin-0, so spin alignment should be zero
 This serves as a validation of the analysis method
 -----------------------------------------
 
-version : v2.0.0
-Date    : 2025.12.30
+version : v2.1.0
+Date    : 2026.01.15
 Author  : Zhen Wang
 */
 
@@ -72,7 +72,15 @@ KsSpinAlignment_NullTest::KsSpinAlignment_NullTest(){
     r8.SetSeed(800);
     r9.SetSeed(900);
 
-    isMC = true;
+    isMC = false;
+    
+    // Initialize cut flow statistics
+    total_ks_candidates = 0;
+    total_after_pt = 0;
+    total_after_cosTheta = 0;
+    total_after_lepton = 0;
+    total_after_pid = 0;
+    
     return;
 }
 
@@ -234,8 +242,8 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
         readMC();
     }
 
-    if(!(countEvt%10000)) 
-    cout << "evt " <<countEvt<< " expNo "<< expNo << ", runNo "<< runNo << ", evtNo "<< evtNo <<endl;
+    //if(!(countEvt%10000)) 
+    //cout << "evt " <<countEvt<< " expNo "<< expNo << ", runNo "<< runNo << ", evtNo "<< evtNo <<endl;
     if(!IpProfile::usable()) {
         cout <<" ip not usable ..." << endl;
         return;
@@ -351,6 +359,15 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
       // 新增：保存Ks顶点坐标
     std::vector<double> ks_vx, ks_vy, ks_vz;
 
+    // Accumulate cut flow statistics
+    int n_total_ks = kslist.size();
+    int n_after_pt = 0;
+    int n_after_cosTheta = 0;
+    int n_after_lepton = 0;
+    int n_after_pid = 0;
+    
+    total_ks_candidates += n_total_ks;
+
     for (size_t i = 0; i < kslist.size(); ++i) {
         const Particle& Kshort = kslist[i];
         // 保存顶点坐标
@@ -366,7 +383,65 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
         Hep3Vector p2(dau2.px(), dau2.py(), dau2.pz());
         int q1 = dau1.charge();
         int q2 = dau2.charge();
-
+        
+        // Apply track quality cuts on Ks daughters (same as previous version, but no dr/dz cut)
+        // Cut on pt and cosTheta
+        double pt1 = p1.perp();
+        double pt2 = p2.perp();
+        double cosTheta1 = cos(p1.theta());
+        double cosTheta2 = cos(p2.theta());
+        
+        if (pt1 < cuts::trkPt || pt2 < cuts::trkPt) 
+            continue;
+        n_after_pt++;
+       
+        if (cosTheta1 < cuts::trk_cosTheta_min || cosTheta1 > cuts::trk_cosTheta_max)
+            continue;
+        if (cosTheta2 < cuts::trk_cosTheta_min || cosTheta2 > cuts::trk_cosTheta_max)
+            continue;
+        n_after_cosTheta++;
+        
+        // Lepton identification: reject electrons and muons
+        eid sel_e1(dau1);
+        eid sel_e2(dau2);
+        Muid_mdst muID1(dau1);
+        Muid_mdst muID2(dau2);
+        
+        double e_id1 = sel_e1.prob(3, -1, 5);
+        double e_id2 = sel_e2.prob(3, -1, 5);
+        double mu_id1 = (muID1.Chi_2() > 0) ? muID1.Muon_likelihood() : 0;
+        double mu_id2 = (muID2.Chi_2() > 0) ? muID2.Muon_likelihood() : 0;
+        
+        float e_cut = 0.85;
+        float mu_cut = 0.9;
+        
+        // Reject if either daughter is identified as electron or muon
+        bool isLepton1 = (mu_id1 > mu_cut) || (e_id1 > e_cut && mu_id1 < mu_cut);
+        bool isLepton2 = (mu_id2 > mu_cut) || (e_id2 > e_cut && mu_id2 < mu_cut);
+        
+        if (isLepton1 || isLepton2)
+            continue;
+        n_after_lepton++;
+        
+        // PID check: ensure daughters are identified as pions
+        atc_pid selKPi1(3, 1, 5, 3, 2);  // K/pi separation for dau1
+        atc_pid selKPi2(3, 1, 5, 3, 2);  // K/pi separation for dau2
+        atc_pid selPiP1(3, 1, 5, 2, 4);  // pi/proton separation for dau1
+        atc_pid selPiP2(3, 1, 5, 2, 4);  // pi/proton separation for dau2
+        
+        double atcKPi1 = selKPi1.prob(dau1);
+        double atcKPi2 = selKPi2.prob(dau2);
+        double atcPiP1 = selPiP1.prob(dau1);
+        double atcPiP2 = selPiP2.prob(dau2);
+        
+        // Require pion-like PID: atcKPi < 0.4 (not kaon) && atcPiP > 0.2 (not proton)
+        bool isPion1 = (atcKPi1 < 0.4 && atcPiP1 > 0.2);
+        bool isPion2 = (atcKPi2 < 0.4 && atcPiP2 > 0.2);
+        
+        if (!isPion1 || !isPion2)
+            continue;
+        n_after_pid++;
+            
         /* this retrieve the 4-p without vertex fit correction
         double m_pi = xmass[2];
         double E1 = sqrt(p1.mag2() + m_pi*m_pi);
@@ -478,6 +553,32 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
         // ------------------------------------------------------
     }
 
+    // Accumulate to total statistics
+    total_after_pt += n_after_pt;
+    total_after_cosTheta += n_after_cosTheta;
+    total_after_lepton += n_after_lepton;
+    total_after_pid += n_after_pid;
+    
+    // Print cumulative cut flow statistics every 10000 events
+    if(!(countEvt%10000)) {
+        cout << "\n=== Cumulative Ks Cut Flow Statistics (up to Event " << countEvt << ") ===" << endl;
+        cout << "Total Ks candidates (after nisKsFinder): " << total_ks_candidates << endl;
+        cout << "After pt cut:                            " << total_after_pt 
+             << " (rejected: " << total_ks_candidates - total_after_pt 
+             << ", eff: " << (total_ks_candidates>0 ? 100.0*total_after_pt/total_ks_candidates : 0) << "%)" << endl;
+        cout << "After cosTheta cut:                      " << total_after_cosTheta 
+             << " (rejected: " << total_after_pt - total_after_cosTheta 
+             << ", eff: " << (total_after_pt>0 ? 100.0*total_after_cosTheta/total_after_pt : 0) << "%)" << endl;
+        cout << "After lepton veto:                       " << total_after_lepton 
+             << " (rejected: " << total_after_cosTheta - total_after_lepton 
+             << ", eff: " << (total_after_cosTheta>0 ? 100.0*total_after_lepton/total_after_cosTheta : 0) << "%)" << endl;
+        cout << "After pion PID cut:                      " << total_after_pid 
+             << " (rejected: " << total_after_lepton - total_after_pid 
+             << ", eff: " << (total_after_lepton>0 ? 100.0*total_after_pid/total_after_lepton : 0) << "%)" << endl;
+        cout << "Overall efficiency:                      " 
+             << (total_ks_candidates>0 ? 100.0*total_after_pid/total_ks_candidates : 0) << "%" << endl;
+        cout << "================================================================" << endl;
+    }
  
     // require at least one K_S candidate
     if (pip_px_cms.size() * pim_px_cms.size() == 0) return;
@@ -635,6 +736,25 @@ void KsSpinAlignment_NullTest::disp_stat(const char*){
 
 
 void KsSpinAlignment_NullTest::term(){
+    // Print final cut flow statistics
+    cout << "\n=== Final Ks Cut Flow Statistics ===" << endl;
+    cout << "Total Ks candidates (after nisKsFinder): " << total_ks_candidates << endl;
+    cout << "After pt cut:                            " << total_after_pt 
+         << " (rejected: " << total_ks_candidates - total_after_pt 
+         << ", eff: " << (total_ks_candidates>0 ? 100.0*total_after_pt/total_ks_candidates : 0) << "%)" << endl;
+    cout << "After cosTheta cut:                      " << total_after_cosTheta 
+         << " (rejected: " << total_after_pt - total_after_cosTheta 
+         << ", eff: " << (total_after_pt>0 ? 100.0*total_after_cosTheta/total_after_pt : 0) << "%)" << endl;
+    cout << "After lepton veto:                       " << total_after_lepton 
+         << " (rejected: " << total_after_cosTheta - total_after_lepton 
+         << ", eff: " << (total_after_cosTheta>0 ? 100.0*total_after_lepton/total_after_cosTheta : 0) << "%)" << endl;
+    cout << "After pion PID cut:                      " << total_after_pid 
+         << " (rejected: " << total_after_lepton - total_after_pid 
+         << ", eff: " << (total_after_lepton>0 ? 100.0*total_after_pid/total_after_lepton : 0) << "%)" << endl;
+    cout << "Overall efficiency:                      " 
+         << (total_ks_candidates>0 ? 100.0*total_after_pid/total_ks_candidates : 0) << "%" << endl;
+    cout << "====================================" << endl;
+    
     output_file->Write();
     output_file->Close();
     return;
@@ -814,3 +934,6 @@ void KsSpinAlignment_NullTest::other(int* , BelleEvent*, int* ){
 // v2.0.0 :
 // recontruct Ks using official goodKs selection ; and fixed little bug in save thrust truth in readMC()
 // Dec. 30, 2025
+// v2.1.0 :
+// put additional cuts on Ks daughter tracks: pt, cosTheta, lepton veto, pion PID
+// add cumulative and final cut flow statistics printout for Ks selection
