@@ -29,7 +29,7 @@
 #include "math.h"
 #include "toolbox/FuncPtr.h"
 #include "TRandom.h"
-#include "nisKsFinder/nisKsFinder.h" 
+#include <mdst/findKs.h> 
 
 #include MDST_H
 #include BELLETDF_H
@@ -47,8 +47,8 @@ K_S is spin-0, so spin alignment should be zero
 This serves as a validation of the analysis method
 -----------------------------------------
 
-version : v2.1.0
-Date    : 2026.01.15
+version : v2.2.0
+Date    : 2026.01.19
 Author  : Zhen Wang
 */
 
@@ -72,11 +72,12 @@ KsSpinAlignment_NullTest::KsSpinAlignment_NullTest(){
     r8.SetSeed(800);
     r9.SetSeed(900);
 
-    isMC = false;
+    isMC = true;
     
     // Initialize cut flow statistics
     total_ks_candidates = 0;
     total_after_pt = 0;
+    total_after_p = 0;
     total_after_cosTheta = 0;
     total_after_lepton = 0;
     total_after_pid = 0;
@@ -337,7 +338,7 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
     Mdst_vee2_Manager& VeeMgr = Mdst_vee2_Manager::get_manager();
 
     std::vector<Particle> kslist;
-
+    
     for(std::vector<Mdst_vee2>::const_iterator iv=VeeMgr.begin(); iv!=VeeMgr.end(); iv++) {
         // Is it a K_short, or another V-particle ?
         if (iv->kind() != 1) continue;
@@ -345,12 +346,12 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
         if(!iv->chgd(0) || !iv->chgd(1)) continue;
         Particle Kshort(*iv);
 
-        // use nisKshort finder to check K-short quality
-        nisKsFinder ksnb;
-        ksnb.candidates(*iv, ip_position);
-        int goodKsFlag = ksnb.standard();
+        // use Fang Fang's Kshort finder to check K-short quality
+        FindKs KSfinder;
+        KSfinder.candidates(*iv, ip_position);
+        int goodKsFlag = KSfinder.goodKs();
 
-        if(goodKsFlag != 1) continue;                
+        if(goodKsFlag == 0) continue;                
 
         //saveKsInfo(Kshort,ksnb.fl());
         kslist.push_back(Kshort);
@@ -362,6 +363,7 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
     // Accumulate cut flow statistics
     int n_total_ks = kslist.size();
     int n_after_pt = 0;
+    int n_after_p = 0;
     int n_after_cosTheta = 0;
     int n_after_lepton = 0;
     int n_after_pid = 0;
@@ -394,6 +396,10 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
         if (pt1 < cuts::trkPt || pt2 < cuts::trkPt) 
             continue;
         n_after_pt++;
+    
+        if (p1.mag() < cuts::trkP || p2.mag() < cuts::trkP)
+            continue;
+        n_after_p++;    
        
         if (cosTheta1 < cuts::trk_cosTheta_min || cosTheta1 > cuts::trk_cosTheta_max)
             continue;
@@ -555,6 +561,7 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
 
     // Accumulate to total statistics
     total_after_pt += n_after_pt;
+    total_after_p += n_after_p; 
     total_after_cosTheta += n_after_cosTheta;
     total_after_lepton += n_after_lepton;
     total_after_pid += n_after_pid;
@@ -562,10 +569,13 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
     // Print cumulative cut flow statistics every 10000 events
     if(!(countEvt%10000)) {
         cout << "\n=== Cumulative Ks Cut Flow Statistics (up to Event " << countEvt << ") ===" << endl;
-        cout << "Total Ks candidates (after nisKsFinder): " << total_ks_candidates << endl;
+        cout << "Total Ks candidates (after FindKs): " << total_ks_candidates << endl;
         cout << "After pt cut:                            " << total_after_pt 
              << " (rejected: " << total_ks_candidates - total_after_pt 
              << ", eff: " << (total_ks_candidates>0 ? 100.0*total_after_pt/total_ks_candidates : 0) << "%)" << endl;
+        cout << "After p cut:                             " << total_after_p 
+             << " (rejected: " << total_after_pt - total_after_p 
+             << ", eff: " << (total_after_pt>0 ? 100.0*total_after_p/total_after_pt : 0) << "%)" << endl;
         cout << "After cosTheta cut:                      " << total_after_cosTheta 
              << " (rejected: " << total_after_pt - total_after_cosTheta 
              << ", eff: " << (total_after_pt>0 ? 100.0*total_after_cosTheta/total_after_pt : 0) << "%)" << endl;
@@ -738,7 +748,7 @@ void KsSpinAlignment_NullTest::disp_stat(const char*){
 void KsSpinAlignment_NullTest::term(){
     // Print final cut flow statistics
     cout << "\n=== Final Ks Cut Flow Statistics ===" << endl;
-    cout << "Total Ks candidates (after nisKsFinder): " << total_ks_candidates << endl;
+    cout << "Total Ks candidates (after FindKs): " << total_ks_candidates << endl;
     cout << "After pt cut:                            " << total_after_pt 
          << " (rejected: " << total_ks_candidates - total_after_pt 
          << ", eff: " << (total_ks_candidates>0 ? 100.0*total_after_pt/total_ks_candidates : 0) << "%)" << endl;
@@ -937,3 +947,7 @@ void KsSpinAlignment_NullTest::other(int* , BelleEvent*, int* ){
 // v2.1.0 :
 // put additional cuts on Ks daughter tracks: pt, cosTheta, lepton veto, pion PID
 // add cumulative and final cut flow statistics printout for Ks selection
+// v2.2.0 :
+// change Ks reconstruct method from nisKsfind to  KSfinder; 
+// and cut track's momentum p > 0.5 GeV; change pt cut to 0.1 GeV to keep it same as in HadronBJ reqiurement
+// Jan. 19, 2026

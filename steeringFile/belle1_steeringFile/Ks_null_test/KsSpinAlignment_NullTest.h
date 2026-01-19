@@ -74,6 +74,7 @@ class KsSpinAlignment_NullTest : public Module{
 
         int total_ks_candidates;
 int total_after_pt;
+int total_after_p;
 int total_after_cosTheta;
 int total_after_lepton;
 int total_after_pid;
