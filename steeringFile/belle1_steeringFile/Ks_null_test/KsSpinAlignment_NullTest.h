@@ -50,6 +50,7 @@ class KsSpinAlignment_NullTest : public Module{
         void other(int*, BelleEvent*, int*);
         std::pair<double, double> calculateHeavyJetMassEnergy(const Vp4 &particles, const Hep3Vector &thrustAxis);
         std::pair<double, double> calculateSphericityAplanarity(const std::vector<HepLorentzVector>& particles);
+        void fillMCTruthForTopo();
 
     public: // BASF parameter
         char* output_filename;
@@ -73,11 +74,11 @@ class KsSpinAlignment_NullTest : public Module{
         double n_ks_truth; // added for truth K_S count
 
         int total_ks_candidates;
-int total_after_pt;
-int total_after_p;
-int total_after_cosTheta;
-int total_after_lepton;
-int total_after_pid;
+        int total_after_pt;
+        int total_after_p;
+        int total_after_cosTheta;
+        int total_after_lepton;
+        int total_after_pid;
 
         struct var_collection{
             int evtNo;
@@ -165,6 +166,11 @@ int total_after_pid;
         Vdouble pim_pt_truth;                    
 
         bool isMC;
+
+        static const int MAX_MC_PARTICLES = 150;  // Adjust as needed
+        int m_nMCGen;
+        double m_MCGenPDG[MAX_MC_PARTICLES];
+        double m_MCGenMothIndex[MAX_MC_PARTICLES];
 };
 
 

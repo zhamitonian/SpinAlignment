@@ -1,6 +1,8 @@
 #include "belle.h"
 #include <cmath>
 #include <algorithm>
+#include <limits>
+#include <map>
 
 #include "event/BelleEvent.h"
 #include "tuple/BelleTupleManager.h"
@@ -47,8 +49,8 @@ K_S is spin-0, so spin alignment should be zero
 This serves as a validation of the analysis method
 -----------------------------------------
 
-version : v2.2.0
-Date    : 2026.01.19
+version : v2.3.0
+Date    : 2026.01.20
 Author  : Zhen Wang
 */
 
@@ -157,7 +159,14 @@ void KsSpinAlignment_NullTest::hist_def(){
     ADDBRANCH(sqrts, D);
 
     ADDBARRAY(thrust, 3, D);
-    
+   
+    if (isMC) {
+        tree->Branch("nMCGen", &m_nMCGen, "nMCGen/I");
+        for (int i = 0; i < MAX_MC_PARTICLES; i++) {
+            tree->Branch(Form("MCGenPDG_%d", i), &m_MCGenPDG[i], Form("MCGenPDG_%d/D", i));
+            tree->Branch(Form("MCGenMothIndex_%d", i), &m_MCGenMothIndex[i], Form("MCGenMothIndex_%d/D", i));
+        }
+    }
 
     if (isMC){
         mctree->Branch("pip_E_cms_truth", &pip_E_cms_truth);
@@ -526,7 +535,7 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
                 }
             } else {
                 if (q1 == 1) pip_isSignal.push_back(false);
-                else if (q1 == -1) pip_isSignal.push_back(false);
+                else if (q1 == -1) pim_isSignal.push_back(false);
             }
             // dau2
             if (get_hepevt(dau2)) {
@@ -553,7 +562,7 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
                 }
             } else {
                 if (q2 == 1) pip_isSignal.push_back(false);
-                else if (q2 == -1) pip_isSignal.push_back(false);
+                else if (q2 == -1) pim_isSignal.push_back(false);
             }
         }
         // ------------------------------------------------------
@@ -607,6 +616,10 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
     m_info.sqrts = kinematics.cm.m();
     double thrust_vec[3] = { thr.mag(), thr.z()/thr.mag(), thr.phi() };
     memcpy(m_info.thrust, thrust_vec, sizeof(thrust_vec));
+
+    if (isMC) {
+        fillMCTruthForTopo();
+    }
 
     tree->Fill();
 
@@ -739,6 +752,51 @@ void KsSpinAlignment_NullTest::readMC()
     return;
 }
 
+void KsSpinAlignment_NullTest::fillMCTruthForTopo() {
+    // Initialize
+    m_nMCGen = 0;
+    for (int i = 0; i < MAX_MC_PARTICLES; i++) {
+        m_MCGenPDG[i] = std::numeric_limits<double>::quiet_NaN();
+        m_MCGenMothIndex[i] = std::numeric_limits<double>::quiet_NaN();
+    }
+
+    Gen_hepevt_Manager& gen_mgr = Gen_hepevt_Manager::get_manager();
+
+    // First pass: filter valid generator-level particles and build ID to new index map
+    std::vector<const Gen_hepevt*> valid_particles;
+    std::map<int, int> id_to_idx;
+    int idx = 0;
+    for (Gen_hepevt_Manager::iterator it = gen_mgr.begin(); it != gen_mgr.end(); ++it) {
+        int pdg = it->idhep();
+        int status = it->isthep();
+        // Only keep particles with valid PDG and generator status
+        if (pdg == 0) continue;
+        if (abs(pdg) > 1e7) continue; // skip junk
+        if (!(status == 1 || status == 2)) continue; // only final/intermediate
+        valid_particles.push_back(&(*it));
+        id_to_idx[it->get_ID()] = idx;
+        idx++;
+        if (idx >= MAX_MC_PARTICLES) break;
+    }
+
+    // Second pass: fill arrays
+    for (size_t i = 0; i < valid_particles.size(); ++i) {
+        const Gen_hepevt* it = valid_particles[i];
+        m_MCGenPDG[i] = static_cast<double>(it->idhep());
+        // Get mother index
+        if (it->mother()) {
+            int mother_id = it->mother().get_ID();
+            if (id_to_idx.find(mother_id) != id_to_idx.end()) {
+                m_MCGenMothIndex[i] = static_cast<double>(id_to_idx[mother_id]);
+            } else {
+                m_MCGenMothIndex[i] = -1.0;
+            }
+        } else {
+            m_MCGenMothIndex[i] = -1.0;  // No mother
+        }
+    }
+    m_nMCGen = valid_particles.size();
+}
 
 void KsSpinAlignment_NullTest::disp_stat(const char*){
     return;
@@ -951,3 +1009,6 @@ void KsSpinAlignment_NullTest::other(int* , BelleEvent*, int* ){
 // change Ks reconstruct method from nisKsfind to  KSfinder; 
 // and cut track's momentum p > 0.5 GeV; change pt cut to 0.1 GeV to keep it same as in HadronBJ reqiurement
 // Jan. 19, 2026
+// v2.3.0 :
+// fix little error on isSignal saving 
+// add topology info fill function
