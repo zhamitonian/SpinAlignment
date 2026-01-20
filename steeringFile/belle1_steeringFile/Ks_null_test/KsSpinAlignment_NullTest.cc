@@ -1,6 +1,8 @@
 #include "belle.h"
 #include <cmath>
 #include <algorithm>
+#include <limits>
+#include <map>
 
 #include "event/BelleEvent.h"
 #include "tuple/BelleTupleManager.h"
@@ -29,7 +31,7 @@
 #include "math.h"
 #include "toolbox/FuncPtr.h"
 #include "TRandom.h"
-#include "nisKsFinder/nisKsFinder.h" 
+#include <mdst/findKs.h> 
 
 #include MDST_H
 #include BELLETDF_H
@@ -47,8 +49,8 @@ K_S is spin-0, so spin alignment should be zero
 This serves as a validation of the analysis method
 -----------------------------------------
 
-version : v2.0.0
-Date    : 2025.12.30
+version : v2.3.0
+Date    : 2026.01.20
 Author  : Zhen Wang
 */
 
@@ -73,6 +75,15 @@ KsSpinAlignment_NullTest::KsSpinAlignment_NullTest(){
     r9.SetSeed(900);
 
     isMC = true;
+    
+    // Initialize cut flow statistics
+    total_ks_candidates = 0;
+    total_after_pt = 0;
+    total_after_p = 0;
+    total_after_cosTheta = 0;
+    total_after_lepton = 0;
+    total_after_pid = 0;
+    
     return;
 }
 
@@ -148,7 +159,14 @@ void KsSpinAlignment_NullTest::hist_def(){
     ADDBRANCH(sqrts, D);
 
     ADDBARRAY(thrust, 3, D);
-    
+   
+    if (isMC) {
+        tree->Branch("nMCGen", &m_nMCGen, "nMCGen/I");
+        for (int i = 0; i < MAX_MC_PARTICLES; i++) {
+            tree->Branch(Form("MCGenPDG_%d", i), &m_MCGenPDG[i], Form("MCGenPDG_%d/D", i));
+            tree->Branch(Form("MCGenMothIndex_%d", i), &m_MCGenMothIndex[i], Form("MCGenMothIndex_%d/D", i));
+        }
+    }
 
     if (isMC){
         mctree->Branch("pip_E_cms_truth", &pip_E_cms_truth);
@@ -234,8 +252,8 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
         readMC();
     }
 
-    if(!(countEvt%10000)) 
-    cout << "evt " <<countEvt<< " expNo "<< expNo << ", runNo "<< runNo << ", evtNo "<< evtNo <<endl;
+    //if(!(countEvt%10000)) 
+    //cout << "evt " <<countEvt<< " expNo "<< expNo << ", runNo "<< runNo << ", evtNo "<< evtNo <<endl;
     if(!IpProfile::usable()) {
         cout <<" ip not usable ..." << endl;
         return;
@@ -329,7 +347,7 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
     Mdst_vee2_Manager& VeeMgr = Mdst_vee2_Manager::get_manager();
 
     std::vector<Particle> kslist;
-
+    
     for(std::vector<Mdst_vee2>::const_iterator iv=VeeMgr.begin(); iv!=VeeMgr.end(); iv++) {
         // Is it a K_short, or another V-particle ?
         if (iv->kind() != 1) continue;
@@ -337,12 +355,12 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
         if(!iv->chgd(0) || !iv->chgd(1)) continue;
         Particle Kshort(*iv);
 
-        // use nisKshort finder to check K-short quality
-        nisKsFinder ksnb;
-        ksnb.candidates(*iv, ip_position);
-        int goodKsFlag = ksnb.standard();
+        // use Fang Fang's Kshort finder to check K-short quality
+        FindKs KSfinder;
+        KSfinder.candidates(*iv, ip_position);
+        int goodKsFlag = KSfinder.goodKs();
 
-        if(goodKsFlag != 1) continue;                
+        if(goodKsFlag == 0) continue;                
 
         //saveKsInfo(Kshort,ksnb.fl());
         kslist.push_back(Kshort);
@@ -350,6 +368,16 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
 
       // 新增：保存Ks顶点坐标
     std::vector<double> ks_vx, ks_vy, ks_vz;
+
+    // Accumulate cut flow statistics
+    int n_total_ks = kslist.size();
+    int n_after_pt = 0;
+    int n_after_p = 0;
+    int n_after_cosTheta = 0;
+    int n_after_lepton = 0;
+    int n_after_pid = 0;
+    
+    total_ks_candidates += n_total_ks;
 
     for (size_t i = 0; i < kslist.size(); ++i) {
         const Particle& Kshort = kslist[i];
@@ -366,7 +394,69 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
         Hep3Vector p2(dau2.px(), dau2.py(), dau2.pz());
         int q1 = dau1.charge();
         int q2 = dau2.charge();
-
+        
+        // Apply track quality cuts on Ks daughters (same as previous version, but no dr/dz cut)
+        // Cut on pt and cosTheta
+        double pt1 = p1.perp();
+        double pt2 = p2.perp();
+        double cosTheta1 = cos(p1.theta());
+        double cosTheta2 = cos(p2.theta());
+        
+        if (pt1 < cuts::trkPt || pt2 < cuts::trkPt) 
+            continue;
+        n_after_pt++;
+    
+        if (p1.mag() < cuts::trkP || p2.mag() < cuts::trkP)
+            continue;
+        n_after_p++;    
+       
+        if (cosTheta1 < cuts::trk_cosTheta_min || cosTheta1 > cuts::trk_cosTheta_max)
+            continue;
+        if (cosTheta2 < cuts::trk_cosTheta_min || cosTheta2 > cuts::trk_cosTheta_max)
+            continue;
+        n_after_cosTheta++;
+        
+        // Lepton identification: reject electrons and muons
+        eid sel_e1(dau1);
+        eid sel_e2(dau2);
+        Muid_mdst muID1(dau1);
+        Muid_mdst muID2(dau2);
+        
+        double e_id1 = sel_e1.prob(3, -1, 5);
+        double e_id2 = sel_e2.prob(3, -1, 5);
+        double mu_id1 = (muID1.Chi_2() > 0) ? muID1.Muon_likelihood() : 0;
+        double mu_id2 = (muID2.Chi_2() > 0) ? muID2.Muon_likelihood() : 0;
+        
+        float e_cut = 0.85;
+        float mu_cut = 0.9;
+        
+        // Reject if either daughter is identified as electron or muon
+        bool isLepton1 = (mu_id1 > mu_cut) || (e_id1 > e_cut && mu_id1 < mu_cut);
+        bool isLepton2 = (mu_id2 > mu_cut) || (e_id2 > e_cut && mu_id2 < mu_cut);
+        
+        if (isLepton1 || isLepton2)
+            continue;
+        n_after_lepton++;
+        
+        // PID check: ensure daughters are identified as pions
+        atc_pid selKPi1(3, 1, 5, 3, 2);  // K/pi separation for dau1
+        atc_pid selKPi2(3, 1, 5, 3, 2);  // K/pi separation for dau2
+        atc_pid selPiP1(3, 1, 5, 2, 4);  // pi/proton separation for dau1
+        atc_pid selPiP2(3, 1, 5, 2, 4);  // pi/proton separation for dau2
+        
+        double atcKPi1 = selKPi1.prob(dau1);
+        double atcKPi2 = selKPi2.prob(dau2);
+        double atcPiP1 = selPiP1.prob(dau1);
+        double atcPiP2 = selPiP2.prob(dau2);
+        
+        // Require pion-like PID: atcKPi < 0.4 (not kaon) && atcPiP > 0.2 (not proton)
+        bool isPion1 = (atcKPi1 < 0.4 && atcPiP1 > 0.2);
+        bool isPion2 = (atcKPi2 < 0.4 && atcPiP2 > 0.2);
+        
+        if (!isPion1 || !isPion2)
+            continue;
+        n_after_pid++;
+            
         /* this retrieve the 4-p without vertex fit correction
         double m_pi = xmass[2];
         double E1 = sqrt(p1.mag2() + m_pi*m_pi);
@@ -445,7 +535,7 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
                 }
             } else {
                 if (q1 == 1) pip_isSignal.push_back(false);
-                else if (q1 == -1) pip_isSignal.push_back(false);
+                else if (q1 == -1) pim_isSignal.push_back(false);
             }
             // dau2
             if (get_hepevt(dau2)) {
@@ -472,12 +562,42 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
                 }
             } else {
                 if (q2 == 1) pip_isSignal.push_back(false);
-                else if (q2 == -1) pip_isSignal.push_back(false);
+                else if (q2 == -1) pim_isSignal.push_back(false);
             }
         }
         // ------------------------------------------------------
     }
 
+    // Accumulate to total statistics
+    total_after_pt += n_after_pt;
+    total_after_p += n_after_p; 
+    total_after_cosTheta += n_after_cosTheta;
+    total_after_lepton += n_after_lepton;
+    total_after_pid += n_after_pid;
+    
+    // Print cumulative cut flow statistics every 10000 events
+    if(!(countEvt%10000)) {
+        cout << "\n=== Cumulative Ks Cut Flow Statistics (up to Event " << countEvt << ") ===" << endl;
+        cout << "Total Ks candidates (after FindKs): " << total_ks_candidates << endl;
+        cout << "After pt cut:                            " << total_after_pt 
+             << " (rejected: " << total_ks_candidates - total_after_pt 
+             << ", eff: " << (total_ks_candidates>0 ? 100.0*total_after_pt/total_ks_candidates : 0) << "%)" << endl;
+        cout << "After p cut:                             " << total_after_p 
+             << " (rejected: " << total_after_pt - total_after_p 
+             << ", eff: " << (total_after_pt>0 ? 100.0*total_after_p/total_after_pt : 0) << "%)" << endl;
+        cout << "After cosTheta cut:                      " << total_after_cosTheta 
+             << " (rejected: " << total_after_pt - total_after_cosTheta 
+             << ", eff: " << (total_after_pt>0 ? 100.0*total_after_cosTheta/total_after_pt : 0) << "%)" << endl;
+        cout << "After lepton veto:                       " << total_after_lepton 
+             << " (rejected: " << total_after_cosTheta - total_after_lepton 
+             << ", eff: " << (total_after_cosTheta>0 ? 100.0*total_after_lepton/total_after_cosTheta : 0) << "%)" << endl;
+        cout << "After pion PID cut:                      " << total_after_pid 
+             << " (rejected: " << total_after_lepton - total_after_pid 
+             << ", eff: " << (total_after_lepton>0 ? 100.0*total_after_pid/total_after_lepton : 0) << "%)" << endl;
+        cout << "Overall efficiency:                      " 
+             << (total_ks_candidates>0 ? 100.0*total_after_pid/total_ks_candidates : 0) << "%" << endl;
+        cout << "================================================================" << endl;
+    }
  
     // require at least one K_S candidate
     if (pip_px_cms.size() * pim_px_cms.size() == 0) return;
@@ -496,6 +616,10 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
     m_info.sqrts = kinematics.cm.m();
     double thrust_vec[3] = { thr.mag(), thr.z()/thr.mag(), thr.phi() };
     memcpy(m_info.thrust, thrust_vec, sizeof(thrust_vec));
+
+    if (isMC) {
+        fillMCTruthForTopo();
+    }
 
     tree->Fill();
 
@@ -628,6 +752,51 @@ void KsSpinAlignment_NullTest::readMC()
     return;
 }
 
+void KsSpinAlignment_NullTest::fillMCTruthForTopo() {
+    // Initialize
+    m_nMCGen = 0;
+    for (int i = 0; i < MAX_MC_PARTICLES; i++) {
+        m_MCGenPDG[i] = std::numeric_limits<double>::quiet_NaN();
+        m_MCGenMothIndex[i] = std::numeric_limits<double>::quiet_NaN();
+    }
+
+    Gen_hepevt_Manager& gen_mgr = Gen_hepevt_Manager::get_manager();
+
+    // First pass: filter valid generator-level particles and build ID to new index map
+    std::vector<const Gen_hepevt*> valid_particles;
+    std::map<int, int> id_to_idx;
+    int idx = 0;
+    for (Gen_hepevt_Manager::iterator it = gen_mgr.begin(); it != gen_mgr.end(); ++it) {
+        int pdg = it->idhep();
+        int status = it->isthep();
+        // Only keep particles with valid PDG and generator status
+        if (pdg == 0) continue;
+        if (abs(pdg) > 1e7) continue; // skip junk
+        if (!(status == 1 || status == 2)) continue; // only final/intermediate
+        valid_particles.push_back(&(*it));
+        id_to_idx[it->get_ID()] = idx;
+        idx++;
+        if (idx >= MAX_MC_PARTICLES) break;
+    }
+
+    // Second pass: fill arrays
+    for (size_t i = 0; i < valid_particles.size(); ++i) {
+        const Gen_hepevt* it = valid_particles[i];
+        m_MCGenPDG[i] = static_cast<double>(it->idhep());
+        // Get mother index
+        if (it->mother()) {
+            int mother_id = it->mother().get_ID();
+            if (id_to_idx.find(mother_id) != id_to_idx.end()) {
+                m_MCGenMothIndex[i] = static_cast<double>(id_to_idx[mother_id]);
+            } else {
+                m_MCGenMothIndex[i] = -1.0;
+            }
+        } else {
+            m_MCGenMothIndex[i] = -1.0;  // No mother
+        }
+    }
+    m_nMCGen = valid_particles.size();
+}
 
 void KsSpinAlignment_NullTest::disp_stat(const char*){
     return;
@@ -635,6 +804,25 @@ void KsSpinAlignment_NullTest::disp_stat(const char*){
 
 
 void KsSpinAlignment_NullTest::term(){
+    // Print final cut flow statistics
+    cout << "\n=== Final Ks Cut Flow Statistics ===" << endl;
+    cout << "Total Ks candidates (after FindKs): " << total_ks_candidates << endl;
+    cout << "After pt cut:                            " << total_after_pt 
+         << " (rejected: " << total_ks_candidates - total_after_pt 
+         << ", eff: " << (total_ks_candidates>0 ? 100.0*total_after_pt/total_ks_candidates : 0) << "%)" << endl;
+    cout << "After cosTheta cut:                      " << total_after_cosTheta 
+         << " (rejected: " << total_after_pt - total_after_cosTheta 
+         << ", eff: " << (total_after_pt>0 ? 100.0*total_after_cosTheta/total_after_pt : 0) << "%)" << endl;
+    cout << "After lepton veto:                       " << total_after_lepton 
+         << " (rejected: " << total_after_cosTheta - total_after_lepton 
+         << ", eff: " << (total_after_cosTheta>0 ? 100.0*total_after_lepton/total_after_cosTheta : 0) << "%)" << endl;
+    cout << "After pion PID cut:                      " << total_after_pid 
+         << " (rejected: " << total_after_lepton - total_after_pid 
+         << ", eff: " << (total_after_lepton>0 ? 100.0*total_after_pid/total_after_lepton : 0) << "%)" << endl;
+    cout << "Overall efficiency:                      " 
+         << (total_ks_candidates>0 ? 100.0*total_after_pid/total_ks_candidates : 0) << "%" << endl;
+    cout << "====================================" << endl;
+    
     output_file->Write();
     output_file->Close();
     return;
@@ -814,3 +1002,13 @@ void KsSpinAlignment_NullTest::other(int* , BelleEvent*, int* ){
 // v2.0.0 :
 // recontruct Ks using official goodKs selection ; and fixed little bug in save thrust truth in readMC()
 // Dec. 30, 2025
+// v2.1.0 :
+// put additional cuts on Ks daughter tracks: pt, cosTheta, lepton veto, pion PID
+// add cumulative and final cut flow statistics printout for Ks selection
+// v2.2.0 :
+// change Ks reconstruct method from nisKsfind to  KSfinder; 
+// and cut track's momentum p > 0.5 GeV; change pt cut to 0.1 GeV to keep it same as in HadronBJ reqiurement
+// Jan. 19, 2026
+// v2.3.0 :
+// fix little error on isSignal saving 
+// add topology info fill function
