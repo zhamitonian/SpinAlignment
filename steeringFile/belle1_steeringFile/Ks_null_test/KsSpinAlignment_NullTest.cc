@@ -31,7 +31,7 @@
 #include "math.h"
 #include "toolbox/FuncPtr.h"
 #include "TRandom.h"
-#include <mdst/findKs.h> 
+#include "nisKsFinder/nisKsFinder.h" 
 
 #include MDST_H
 #include BELLETDF_H
@@ -49,7 +49,7 @@ K_S is spin-0, so spin alignment should be zero
 This serves as a validation of the analysis method
 -----------------------------------------
 
-version : v2.3.0
+version : v2.3.1
 Date    : 2026.01.20
 Author  : Zhen Wang
 */
@@ -355,12 +355,13 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
         if(!iv->chgd(0) || !iv->chgd(1)) continue;
         Particle Kshort(*iv);
 
-        // use Fang Fang's Kshort finder to check K-short quality
-        FindKs KSfinder;
-        KSfinder.candidates(*iv, ip_position);
-        int goodKsFlag = KSfinder.goodKs();
+        // use nisKshort finder to check K-short quality
+        nisKsFinder ksnb;
+        ksnb.candidates(*iv, ip_position);
+        int goodKsFlag = ksnb.standard();
 
-        if(goodKsFlag == 0) continue;                
+        if(goodKsFlag != 1) continue;    
+
 
         //saveKsInfo(Kshort,ksnb.fl());
         kslist.push_back(Kshort);
@@ -999,16 +1000,23 @@ void KsSpinAlignment_NullTest::other(int* , BelleEvent*, int* ){
 // v1.0.1 :
 // add continue statement after warning message for K_S decay daughters number not equal to 2
 // the crash is due to gen_hepevt(chg) return nullptr || gen.mother() , add check fix this issue. when apply mc truth matching
+
 // v2.0.0 :
 // recontruct Ks using official goodKs selection ; and fixed little bug in save thrust truth in readMC()
 // Dec. 30, 2025
+
 // v2.1.0 :
 // put additional cuts on Ks daughter tracks: pt, cosTheta, lepton veto, pion PID
 // add cumulative and final cut flow statistics printout for Ks selection
+
 // v2.2.0 :
 // change Ks reconstruct method from nisKsfind to  KSfinder; 
 // and cut track's momentum p > 0.5 GeV; change pt cut to 0.1 GeV to keep it same as in HadronBJ reqiurement
 // Jan. 19, 2026
+
 // v2.3.0 :
 // fix little error on isSignal saving 
 // add topology info fill function
+// v2.3.1 :
+// change back to nisKsFind for test
+// Jan. 20, 2026
