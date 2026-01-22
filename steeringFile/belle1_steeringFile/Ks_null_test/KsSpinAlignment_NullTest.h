@@ -133,6 +133,8 @@ class KsSpinAlignment_NullTest : public Module{
         Vdouble pim_pz_cms;
         Vdouble pip_p;
         Vdouble pim_p;
+        Vdouble pip_costheta;
+        Vdouble pim_costheta;
 
         Vdouble ks_m_combine;
         Vdouble ks_m_read;
@@ -167,7 +169,7 @@ class KsSpinAlignment_NullTest : public Module{
 
         bool isMC;
 
-        static const int MAX_MC_PARTICLES = 150;  // Adjust as needed
+        static const int MAX_MC_PARTICLES = 80;  // Adjust as needed
         int m_nMCGen;
         double m_MCGenPDG[MAX_MC_PARTICLES];
         double m_MCGenMothIndex[MAX_MC_PARTICLES];

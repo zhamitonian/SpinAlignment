@@ -31,7 +31,7 @@
 #include "math.h"
 #include "toolbox/FuncPtr.h"
 #include "TRandom.h"
-#include "nisKsFinder/nisKsFinder.h" 
+#include <mdst/findKs.h> 
 
 #include MDST_H
 #include BELLETDF_H
@@ -49,7 +49,7 @@ K_S is spin-0, so spin alignment should be zero
 This serves as a validation of the analysis method
 -----------------------------------------
 
-version : v2.3.1
+version : v2.3.2
 Date    : 2026.01.20
 Author  : Zhen Wang
 */
@@ -201,6 +201,8 @@ void KsSpinAlignment_NullTest::hist_def(){
 
     tree->Branch("pip_p", &pip_p);
     tree->Branch("pim_p", &pim_p);
+    tree->Branch("pip_costheta", &pip_costheta);
+    tree->Branch("pim_costheta", &pim_costheta);
 
     //tree->Branch("ks_m_combine", &ks_m_combine);
     //tree->Branch("ks_m_read", &ks_m_read);
@@ -334,7 +336,7 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
     
     pip_E_cms.clear(); pip_px_cms.clear(); pip_py_cms.clear(); pip_pz_cms.clear();
     pim_E_cms.clear(); pim_px_cms.clear(); pim_py_cms.clear(); pim_pz_cms.clear();
-    pip_p.clear(); pim_p.clear();
+    pip_p.clear(); pim_p.clear(); pip_costheta.clear(); pim_costheta.clear();
     //ks_m_combine.clear(); ks_m_read.clear();
     if (isMC) {
         pip_isSignal.clear(); pim_isSignal.clear();
@@ -355,13 +357,12 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
         if(!iv->chgd(0) || !iv->chgd(1)) continue;
         Particle Kshort(*iv);
 
-        // use nisKshort finder to check K-short quality
-        nisKsFinder ksnb;
-        ksnb.candidates(*iv, ip_position);
-        int goodKsFlag = ksnb.standard();
+        // use Fang Fang's Kshort finder to check K-short quality
+        FindKs KSfinder;
+        KSfinder.candidates(*iv, ip_position);
+        int goodKsFlag = KSfinder.goodKs();
 
-        if(goodKsFlag != 1) continue;    
-
+        if(goodKsFlag == 0) continue;     
 
         //saveKsInfo(Kshort,ksnb.fl());
         kslist.push_back(Kshort);
@@ -407,8 +408,8 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
             continue;
         n_after_pt++;
     
-        if (p1.mag() < cuts::trkP || p2.mag() < cuts::trkP)
-            continue;
+        //if (p1.mag() < cuts::trkP || p2.mag() < cuts::trkP)
+        //    continue;
         n_after_p++;    
        
         if (cosTheta1 < cuts::trk_cosTheta_min || cosTheta1 > cuts::trk_cosTheta_max)
@@ -478,12 +479,14 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
             pip_py_cms.push_back(p4_1.py());
             pip_pz_cms.push_back(p4_1.pz());
             pip_p.push_back(p1.mag());
+            pip_costheta.push_back(cosTheta1);
         } else if (q1 == -1) {
             pim_E_cms.push_back(p4_1.e());
             pim_px_cms.push_back(p4_1.px());
             pim_py_cms.push_back(p4_1.py());
             pim_pz_cms.push_back(p4_1.pz());
             pim_p.push_back(p1.mag());
+            pim_costheta.push_back(cosTheta1);
         }
         if (q2 == 1) {
             pip_E_cms.push_back(p4_2.e());
@@ -491,12 +494,14 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
             pip_py_cms.push_back(p4_2.py());
             pip_pz_cms.push_back(p4_2.pz());
             pip_p.push_back(p2.mag());
+            pip_costheta.push_back(cosTheta2);
         } else if (q2 == -1) {
             pim_E_cms.push_back(p4_2.e());
             pim_px_cms.push_back(p4_2.px());
             pim_py_cms.push_back(p4_2.py());
             pim_pz_cms.push_back(p4_2.pz());
             pim_p.push_back(p2.mag());
+            pim_costheta.push_back(cosTheta2);
         }
         
         // ----- test coordinate Ks reconstruction -----
@@ -1020,3 +1025,8 @@ void KsSpinAlignment_NullTest::other(int* , BelleEvent*, int* ){
 // v2.3.1 :
 // change back to nisKsFind for test
 // Jan. 20, 2026
+
+// v2.3.2 :
+// use FindKs; not cut p > 0.5 GeV ; save pion's costheta ; and change MAX_MC_PARTICLES to 80
+// Jan. 22, 2026
+
