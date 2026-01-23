@@ -49,7 +49,7 @@ K_S is spin-0, so spin alignment should be zero
 This serves as a validation of the analysis method
 -----------------------------------------
 
-version : v2.3.0
+version : v2.3.2
 Date    : 2026.01.20
 Author  : Zhen Wang
 */
@@ -201,6 +201,8 @@ void KsSpinAlignment_NullTest::hist_def(){
 
     tree->Branch("pip_p", &pip_p);
     tree->Branch("pim_p", &pim_p);
+    tree->Branch("pip_costheta", &pip_costheta);
+    tree->Branch("pim_costheta", &pim_costheta);
 
     //tree->Branch("ks_m_combine", &ks_m_combine);
     //tree->Branch("ks_m_read", &ks_m_read);
@@ -334,7 +336,7 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
     
     pip_E_cms.clear(); pip_px_cms.clear(); pip_py_cms.clear(); pip_pz_cms.clear();
     pim_E_cms.clear(); pim_px_cms.clear(); pim_py_cms.clear(); pim_pz_cms.clear();
-    pip_p.clear(); pim_p.clear();
+    pip_p.clear(); pim_p.clear(); pip_costheta.clear(); pim_costheta.clear();
     //ks_m_combine.clear(); ks_m_read.clear();
     if (isMC) {
         pip_isSignal.clear(); pim_isSignal.clear();
@@ -360,7 +362,7 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
         KSfinder.candidates(*iv, ip_position);
         int goodKsFlag = KSfinder.goodKs();
 
-        if(goodKsFlag == 0) continue;                
+        if(goodKsFlag == 0) continue;     
 
         //saveKsInfo(Kshort,ksnb.fl());
         kslist.push_back(Kshort);
@@ -406,8 +408,8 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
             continue;
         n_after_pt++;
     
-        if (p1.mag() < cuts::trkP || p2.mag() < cuts::trkP)
-            continue;
+        //if (p1.mag() < cuts::trkP || p2.mag() < cuts::trkP)
+        //    continue;
         n_after_p++;    
        
         if (cosTheta1 < cuts::trk_cosTheta_min || cosTheta1 > cuts::trk_cosTheta_max)
@@ -477,12 +479,14 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
             pip_py_cms.push_back(p4_1.py());
             pip_pz_cms.push_back(p4_1.pz());
             pip_p.push_back(p1.mag());
+            pip_costheta.push_back(cosTheta1);
         } else if (q1 == -1) {
             pim_E_cms.push_back(p4_1.e());
             pim_px_cms.push_back(p4_1.px());
             pim_py_cms.push_back(p4_1.py());
             pim_pz_cms.push_back(p4_1.pz());
             pim_p.push_back(p1.mag());
+            pim_costheta.push_back(cosTheta1);
         }
         if (q2 == 1) {
             pip_E_cms.push_back(p4_2.e());
@@ -490,12 +494,14 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
             pip_py_cms.push_back(p4_2.py());
             pip_pz_cms.push_back(p4_2.pz());
             pip_p.push_back(p2.mag());
+            pip_costheta.push_back(cosTheta2);
         } else if (q2 == -1) {
             pim_E_cms.push_back(p4_2.e());
             pim_px_cms.push_back(p4_2.px());
             pim_py_cms.push_back(p4_2.py());
             pim_pz_cms.push_back(p4_2.pz());
             pim_p.push_back(p2.mag());
+            pim_costheta.push_back(cosTheta2);
         }
         
         // ----- test coordinate Ks reconstruction -----
@@ -999,16 +1005,28 @@ void KsSpinAlignment_NullTest::other(int* , BelleEvent*, int* ){
 // v1.0.1 :
 // add continue statement after warning message for K_S decay daughters number not equal to 2
 // the crash is due to gen_hepevt(chg) return nullptr || gen.mother() , add check fix this issue. when apply mc truth matching
+
 // v2.0.0 :
 // recontruct Ks using official goodKs selection ; and fixed little bug in save thrust truth in readMC()
 // Dec. 30, 2025
+
 // v2.1.0 :
 // put additional cuts on Ks daughter tracks: pt, cosTheta, lepton veto, pion PID
 // add cumulative and final cut flow statistics printout for Ks selection
+
 // v2.2.0 :
 // change Ks reconstruct method from nisKsfind to  KSfinder; 
 // and cut track's momentum p > 0.5 GeV; change pt cut to 0.1 GeV to keep it same as in HadronBJ reqiurement
 // Jan. 19, 2026
+
 // v2.3.0 :
 // fix little error on isSignal saving 
 // add topology info fill function
+// v2.3.1 :
+// change back to nisKsFind for test
+// Jan. 20, 2026
+
+// v2.3.2 :
+// use FindKs; not cut p > 0.5 GeV ; save pion's costheta ; and change MAX_MC_PARTICLES to 80
+// Jan. 22, 2026
+
