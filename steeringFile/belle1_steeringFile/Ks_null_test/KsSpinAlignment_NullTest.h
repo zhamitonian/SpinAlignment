@@ -139,8 +139,8 @@ class KsSpinAlignment_NullTest : public Module{
         Vdouble ks_m_combine;
         Vdouble ks_m_read;
         
-        Vbool pip_isSignal;
-        Vbool pim_isSignal;
+        Vint pip_isSignal;
+        Vint pim_isSignal;
 
         Vdouble pip_E_cms_gen;
         Vdouble pip_px_cms_gen;

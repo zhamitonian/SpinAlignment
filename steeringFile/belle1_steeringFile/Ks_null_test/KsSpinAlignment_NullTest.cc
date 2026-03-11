@@ -49,8 +49,8 @@ K_S is spin-0, so spin alignment should be zero
 This serves as a validation of the analysis method
 -----------------------------------------
 
-version : v2.3.2
-Date    : 2026.01.20
+version : v2.3.3
+Date    : 2026.03.11
 Author  : Zhen Wang
 */
 
@@ -74,7 +74,7 @@ KsSpinAlignment_NullTest::KsSpinAlignment_NullTest(){
     r8.SetSeed(800);
     r9.SetSeed(900);
 
-    isMC = true;
+    isMC = false;
     
     // Initialize cut flow statistics
     total_ks_candidates = 0;
@@ -516,60 +516,61 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
 
         // ----------- save MC generate level info -----------
         if (isMC) {
-            // dau1
-            if (get_hepevt(dau1)) {
-                const Gen_hepevt& gen = gen_level(get_hepevt(dau1));
-                if (gen.mother() && abs(gen.mother().idhep()) == 310 && abs(gen.idhep()) == 211) {
-                    HepLorentzVector p4_truth(gen.PX(), gen.PY(), gen.PZ(), gen.E());
-                    p4_truth.boost(kinematics.CMBoost);
-                    if (q1 == 1) {
+            // isSignal definition:
+            // 0: not from Ks/K0
+            // 1: pi from Ks/K0 directly
+            // 2: mu from pi, with grandmother Ks/K0 (to check if mu from pi can be misidentified as pion and affect the signal)
+            auto saveTruthForDaughter = [&](const Mdst_charged& dau, int q) {
+                if (q != 1 && q != -1) return;
+
+                Gen_hepevt* hepevt = get_hepevt(dau);
+                int isSignal = 0;
+                HepLorentzVector p4_truth;
+
+                if (hepevt) {
+                    const Gen_hepevt& gen = gen_level(hepevt);
+                    const int dauPDG    = abs(gen.idhep());
+                    const int motherPDG = gen.mother() ? abs(gen.mother().idhep()) : 0;
+
+                    if (motherPDG == 310 || motherPDG == 311) {
+                        // pi from Ks/K0 directly
+                        if (dauPDG == 211) {
+                            p4_truth = HepLorentzVector(gen.PX(), gen.PY(), gen.PZ(), gen.E());
+                            p4_truth.boost(kinematics.CMBoost);
+                            isSignal = 1;
+                        }
+                    } else if (dauPDG == 13 && motherPDG == 211) {
+                        // mu from pi, check grandmother is Ks/K0
+                        const int grandmaPDG = gen.mother().mother() ? abs(gen.mother().mother().idhep()) : 0;
+                        if (grandmaPDG == 310 || grandmaPDG == 311) {
+                            p4_truth = HepLorentzVector(gen.PX(), gen.PY(), gen.PZ(), gen.E());
+                            p4_truth.boost(kinematics.CMBoost);
+                            isSignal = 2;
+                        }
+                    }
+                }
+
+                if (q == 1) {
+                    if (isSignal) {
                         pip_E_cms_gen.push_back(p4_truth.e());
                         pip_px_cms_gen.push_back(p4_truth.px());
                         pip_py_cms_gen.push_back(p4_truth.py());
                         pip_pz_cms_gen.push_back(p4_truth.pz());
-                        pip_isSignal.push_back(true);
-                    } else if (q1 == -1) {
+                    }
+                    pip_isSignal.push_back(isSignal);
+                } else {
+                    if (isSignal) {
                         pim_E_cms_gen.push_back(p4_truth.e());
                         pim_px_cms_gen.push_back(p4_truth.px());
                         pim_py_cms_gen.push_back(p4_truth.py());
                         pim_pz_cms_gen.push_back(p4_truth.pz());
-                        pim_isSignal.push_back(true);
                     }
-                } else {
-                    if (q1 == 1) pip_isSignal.push_back(false);
-                    else if (q1 == -1) pim_isSignal.push_back(false);
+                    pim_isSignal.push_back(isSignal);
                 }
-            } else {
-                if (q1 == 1) pip_isSignal.push_back(false);
-                else if (q1 == -1) pim_isSignal.push_back(false);
-            }
-            // dau2
-            if (get_hepevt(dau2)) {
-                const Gen_hepevt& gen = gen_level(get_hepevt(dau2));
-                if (gen.mother() && abs(gen.mother().idhep()) == 310 && abs(gen.idhep()) == 211) {
-                    HepLorentzVector p4_truth(gen.PX(), gen.PY(), gen.PZ(), gen.E());
-                    p4_truth.boost(kinematics.CMBoost);
-                    if (q2 == 1) {
-                        pip_E_cms_gen.push_back(p4_truth.e());
-                        pip_px_cms_gen.push_back(p4_truth.px());
-                        pip_py_cms_gen.push_back(p4_truth.py());
-                        pip_pz_cms_gen.push_back(p4_truth.pz());
-                        pip_isSignal.push_back(true);
-                    } else if (q2 == -1) {
-                        pim_E_cms_gen.push_back(p4_truth.e());
-                        pim_px_cms_gen.push_back(p4_truth.px());
-                        pim_py_cms_gen.push_back(p4_truth.py());
-                        pim_pz_cms_gen.push_back(p4_truth.pz());
-                        pim_isSignal.push_back(true);
-                    }
-                } else {
-                    if (q2 == 1) pip_isSignal.push_back(false);
-                    else if (q2 == -1) pim_isSignal.push_back(false);
-                }
-            } else {
-                if (q2 == 1) pip_isSignal.push_back(false);
-                else if (q2 == -1) pim_isSignal.push_back(false);
-            }
+            };
+
+            saveTruthForDaughter(dau1, q1);
+            saveTruthForDaughter(dau2, q2);
         }
         // ------------------------------------------------------
     }
@@ -1030,3 +1031,7 @@ void KsSpinAlignment_NullTest::other(int* , BelleEvent*, int* ){
 // use FindKs; not cut p > 0.5 GeV ; save pion's costheta ; and change MAX_MC_PARTICLES to 80
 // Jan. 22, 2026
 
+// v2.3.3 : 
+// fix isSignal definition: 0 not from Ks/K0; 1 pi from Ks/K0 directly; 
+// 2 mu from pi with grandmother Ks/K0; and add check for gen.mother() when apply mc truth matching to avoid crash
+// Mar. 11, 2026
