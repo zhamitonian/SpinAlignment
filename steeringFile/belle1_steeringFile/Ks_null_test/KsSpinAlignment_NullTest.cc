@@ -49,8 +49,8 @@ K_S is spin-0, so spin alignment should be zero
 This serves as a validation of the analysis method
 -----------------------------------------
 
-version : v2.3.2
-Date    : 2026.01.20
+version : v2.3.3
+Date    : 2026.03.11
 Author  : Zhen Wang
 */
 
@@ -515,60 +515,92 @@ void KsSpinAlignment_NullTest::event(BelleEvent* evptr, int* status){
         */
 
         // ----------- save MC generate level info -----------
+        // isSignal: 0 = not from Ks/K0;  1 = pi directly from Ks/K0;
+        //           2 = mu from pi whose mother is Ks/K0 (pi->mu misID check)
         if (isMC) {
-            // dau1
-            if (get_hepevt(dau1)) {
-                const Gen_hepevt& gen = gen_level(get_hepevt(dau1));
-                if (gen.mother() && abs(gen.mother().idhep()) == 310 && abs(gen.idhep()) == 211) {
-                    HepLorentzVector p4_truth(gen.PX(), gen.PY(), gen.PZ(), gen.E());
-                    p4_truth.boost(kinematics.CMBoost);
-                    if (q1 == 1) {
+            // --- dau1 ---
+            {
+                Gen_hepevt hepevt = get_hepevt(dau1);
+                int isSignal = 0;
+                HepLorentzVector p4_truth;
+                if (hepevt) {
+                    const Gen_hepevt& gen = gen_level(hepevt);
+                    int dauPDG    = abs(gen.idhep());
+                    int motherPDG = gen.mother() ? abs(gen.mother().idhep()) : 0;
+                    if (motherPDG == 310 || motherPDG == 311) {
+                        if (dauPDG == 211) {
+                            p4_truth = HepLorentzVector(gen.PX(), gen.PY(), gen.PZ(), gen.E());
+                            p4_truth.boost(kinematics.CMBoost);
+                            isSignal = 1;
+                        }
+                    } else if (dauPDG == 13 && motherPDG == 211) {
+                        int grandmaPDG = gen.mother().mother() ? abs(gen.mother().mother().idhep()) : 0;
+                        if (grandmaPDG == 310 || grandmaPDG == 311) {
+                            p4_truth = HepLorentzVector(gen.PX(), gen.PY(), gen.PZ(), gen.E());
+                            p4_truth.boost(kinematics.CMBoost);
+                            isSignal = 2;
+                        }
+                    }
+                }
+                if (q1 == 1) {
+                    if (isSignal) {
                         pip_E_cms_gen.push_back(p4_truth.e());
                         pip_px_cms_gen.push_back(p4_truth.px());
                         pip_py_cms_gen.push_back(p4_truth.py());
                         pip_pz_cms_gen.push_back(p4_truth.pz());
-                        pip_isSignal.push_back(true);
-                    } else if (q1 == -1) {
+                    }
+                    pip_isSignal.push_back(isSignal);
+                } else if (q1 == -1) {
+                    if (isSignal) {
                         pim_E_cms_gen.push_back(p4_truth.e());
                         pim_px_cms_gen.push_back(p4_truth.px());
                         pim_py_cms_gen.push_back(p4_truth.py());
                         pim_pz_cms_gen.push_back(p4_truth.pz());
-                        pim_isSignal.push_back(true);
                     }
-                } else {
-                    if (q1 == 1) pip_isSignal.push_back(false);
-                    else if (q1 == -1) pim_isSignal.push_back(false);
+                    pim_isSignal.push_back(isSignal);
                 }
-            } else {
-                if (q1 == 1) pip_isSignal.push_back(false);
-                else if (q1 == -1) pim_isSignal.push_back(false);
             }
-            // dau2
-            if (get_hepevt(dau2)) {
-                const Gen_hepevt& gen = gen_level(get_hepevt(dau2));
-                if (gen.mother() && abs(gen.mother().idhep()) == 310 && abs(gen.idhep()) == 211) {
-                    HepLorentzVector p4_truth(gen.PX(), gen.PY(), gen.PZ(), gen.E());
-                    p4_truth.boost(kinematics.CMBoost);
-                    if (q2 == 1) {
+            // --- dau2 ---
+            {
+                Gen_hepevt hepevt = get_hepevt(dau2);
+                int isSignal = 0;
+                HepLorentzVector p4_truth;
+                if (hepevt) {
+                    const Gen_hepevt& gen = gen_level(hepevt);
+                    int dauPDG    = abs(gen.idhep());
+                    int motherPDG = gen.mother() ? abs(gen.mother().idhep()) : 0;
+                    if (motherPDG == 310 || motherPDG == 311) {
+                        if (dauPDG == 211) {
+                            p4_truth = HepLorentzVector(gen.PX(), gen.PY(), gen.PZ(), gen.E());
+                            p4_truth.boost(kinematics.CMBoost);
+                            isSignal = 1;
+                        }
+                    } else if (dauPDG == 13 && motherPDG == 211) {
+                        int grandmaPDG = gen.mother().mother() ? abs(gen.mother().mother().idhep()) : 0;
+                        if (grandmaPDG == 310 || grandmaPDG == 311) {
+                            p4_truth = HepLorentzVector(gen.PX(), gen.PY(), gen.PZ(), gen.E());
+                            p4_truth.boost(kinematics.CMBoost);
+                            isSignal = 2;
+                        }
+                    }
+                }
+                if (q2 == 1) {
+                    if (isSignal) {
                         pip_E_cms_gen.push_back(p4_truth.e());
                         pip_px_cms_gen.push_back(p4_truth.px());
                         pip_py_cms_gen.push_back(p4_truth.py());
                         pip_pz_cms_gen.push_back(p4_truth.pz());
-                        pip_isSignal.push_back(true);
-                    } else if (q2 == -1) {
+                    }
+                    pip_isSignal.push_back(isSignal);
+                } else if (q2 == -1) {
+                    if (isSignal) {
                         pim_E_cms_gen.push_back(p4_truth.e());
                         pim_px_cms_gen.push_back(p4_truth.px());
                         pim_py_cms_gen.push_back(p4_truth.py());
                         pim_pz_cms_gen.push_back(p4_truth.pz());
-                        pim_isSignal.push_back(true);
                     }
-                } else {
-                    if (q2 == 1) pip_isSignal.push_back(false);
-                    else if (q2 == -1) pim_isSignal.push_back(false);
+                    pim_isSignal.push_back(isSignal);
                 }
-            } else {
-                if (q2 == 1) pip_isSignal.push_back(false);
-                else if (q2 == -1) pim_isSignal.push_back(false);
             }
         }
         // ------------------------------------------------------
@@ -667,19 +699,44 @@ void KsSpinAlignment_NullTest::readMC()
 
         if (pid == 310)  // K_S (PDG code 310)
         {
-            int ndaug = (gen_it->daLast() - gen_it->daFirst()) + 1;
-            //if (ndaug != 2) continue; // K_S -> pi+ pi- only
-            if (ndaug != 2){
-                cout << "Warning: K_S decay daughters number is " << ndaug << endl;
+            int daFirst = gen_it->daFirst();
+            int daLast  = gen_it->daLast();
+            if (daFirst <= 0 || daLast < daFirst) {
+                cout << "Warning: invalid K_S daughter index range: daFirst="
+                     << daFirst << ", daLast=" << daLast << endl;
+                continue;
+            }
+
+            int ndaug = (daLast - daFirst) + 1;
+            std::vector<int> daughter_pdgs;
+            daughter_pdgs.reserve(ndaug);
+            for (int i = 0; i < ndaug; ++i){
+                Panther_ID ID(daFirst + i);
+                Gen_hepevt& daughter = gen_hepevt_mgr(ID);
+                daughter_pdgs.push_back(daughter.idhep());
+            }
+
+            bool hasPiPlus  = (std::find(daughter_pdgs.begin(), daughter_pdgs.end(),  211) != daughter_pdgs.end());
+            bool hasPiMinus = (std::find(daughter_pdgs.begin(), daughter_pdgs.end(), -211) != daughter_pdgs.end());
+
+            if (!(hasPiPlus && hasPiMinus)) {
+                //cout << "Warning: K_S daughters do not contain both pi+ (211) and pi- (-211)" << endl;
+                continue;
+            }
+            else if(ndaug != 2) {
+                cout << "K_S daughters: ";
+                for (size_t i = 0; i < daughter_pdgs.size(); ++i) {
+                    cout << daughter_pdgs[i] << " ";
+                }
+                cout << endl;
                 continue;
             }
 
             for (int i = 0; i < ndaug; ++i){
-                Panther_ID ID(gen_it->daFirst() + i);
+                Panther_ID ID(daFirst + i);
                 Gen_hepevt& daughter = gen_hepevt_mgr(ID);
                 
                 int daughter_pid = daughter.idhep();
-                //cout << "daughter: "<< i <<" pid: " << daughter_pid << endl;
                 if (abs(daughter_pid) != 211) continue; // only pi+ and pi-
                 
                 HepLorentzVector daughter_v4 (daughter.PX(), daughter.PY(), daughter.PZ(), daughter.E());
@@ -1030,3 +1087,7 @@ void KsSpinAlignment_NullTest::other(int* , BelleEvent*, int* ){
 // use FindKs; not cut p > 0.5 GeV ; save pion's costheta ; and change MAX_MC_PARTICLES to 80
 // Jan. 22, 2026
 
+// v2.3.3 : 
+// fix isSignal definition: 0 not from Ks/K0; 1 pi from Ks/K0 directly; 
+// 2 mu from pi with grandmother Ks/K0; and add check for gen.mother() when apply mc truth matching to avoid crash
+// Mar. 11, 2026
