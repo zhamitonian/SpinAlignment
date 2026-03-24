@@ -6,8 +6,8 @@ import numpy as np
 import ROOT as R
 
 from common.plot.comparison_plotter import plot_data_mc
-from common.config.comparison import DEFAULT_KS_VAR_CONFIG, DEFAULT_KS_WEIGHT_CONFIG
-
+from common.config.comparison import DEFAULT_VAR_CONFIG, DEFAULT_KS_WEIGHT_CONFIG
+from OFFLINE_PROCESS import RDF_process
 
 class DataMcComparer:
     _cpp_functions_defined = False
@@ -182,9 +182,19 @@ class DataMcComparer:
         output_path = os.path.join(self.output_dir, f"{var}.png")
         plot_data_mc(h_data, h_mc, output_path, leg_position=leg_position, normalize=normalize)
 
-    def start_plotting(self, var_config=None, weight_config=None):
-        if var_config is None:
-            var_config = DEFAULT_KS_VAR_CONFIG
+    def start_plotting(self, var_list, weight_config=None, reweight_var=None):
+        # Initialize local dataframe to carry cumulative reweighting effects
+        df_mc = self.df_mc
+        processor = RDF_process() if reweight_var else None
+
+        if reweight_var is not None:
+            # Put reweight_var first to calculate weights before other plots
+            if reweight_var in var_list:
+                var_list = [reweight_var] + [v for v in var_list if v != reweight_var]
+            else:
+                var_list = [reweight_var] + var_list
+
+        var_config = {v: DEFAULT_VAR_CONFIG[v] for v in var_list if v in DEFAULT_VAR_CONFIG}
 
         for var, (nbins, xmin, xmax, label) in var_config.items():
             particle_name = var.split("_")[0]
@@ -193,16 +203,36 @@ class DataMcComparer:
             else:
                 h_data = self.get_data_daughter_hist(self.df_data, label, var_name=var, nbins=nbins, xmin=xmin, xmax=xmax)
 
-            if weight_config is not None and particle_name in weight_config.keys():
-                print(f"Applying weight for {particle_name}: {weight_config[particle_name]}")
-                h_mc = self.get_MC_hist(self.df_mc, label, var_name=var, nbins=nbins, xmin=xmin, xmax=xmax, weight=weight_config[particle_name])
+            current_weight = weight_config.get(particle_name) if weight_config else None
+            
+            if current_weight:
+                print(f"Applying weight for {particle_name}: {current_weight}")
+                h_mc = self.get_MC_hist(df_mc, label, var_name=var, nbins=nbins, xmin=xmin, xmax=xmax, weight=current_weight)
             else:
-                h_mc = self.get_MC_hist(self.df_mc, label, var_name=var, nbins=nbins, xmin=xmin, xmax=xmax)
+                h_mc = self.get_MC_hist(df_mc, label, var_name=var, nbins=nbins, xmin=xmin, xmax=xmax)
+            
+            if reweight_var and var == reweight_var and processor:
+                # Calculate weights using the current configuration
+                df_mc = processor.quick_reweight(df_mc, h_data=h_data, MC_weight=current_weight)
+                
+                # Update all weight branches to include the new 'data_mc_weight' factor
+                if weight_config:
+                    updated_branches = set()
+                    for branch in weight_config.values():
+                        if branch not in updated_branches:
+                            print(f" >> Updating weight branch: {branch}")
+                            df_mc = df_mc.Redefine(branch, f"{branch} * data_mc_weight")
+                            updated_branches.add(branch)
+                else:
+                    current_weight = "data_mc_weight"
+                
+                h_mc = self.get_MC_hist(df_mc, label, var_name=var, nbins=nbins, xmin=xmin, xmax=xmax, weight=current_weight)
+                df_mc.Snapshot("event", os.path.join(self.output_dir, "reweighted_MC.root"))
 
             self._plot_pair(h_data, h_mc, var, leg_position=2, normalize=True)
 
 
-def process_single_bin(flat_bin_idx, binning_config, var_config, data_root_dir, splot_root_dir, mc_rootfile, batch_output_dir, mc_weight_config=DEFAULT_KS_WEIGHT_CONFIG):
+def process_single_bin(flat_bin_idx, binning_config, var_list, data_root_dir, splot_root_dir, mc_rootfile, batch_output_dir, mc_weight_config=DEFAULT_KS_WEIGHT_CONFIG, reweight_var=None):
     bins = [len(binning_list) - 1 for binning_list in binning_config.values()]
     total_bins = int(np.prod(bins))
     pad_width = len(str(total_bins - 1))
@@ -266,7 +296,7 @@ def process_single_bin(flat_bin_idx, binning_config, var_config, data_root_dir, 
     print(f"Loading MC file: {mc_rootfile}")
     df_mc_full = R.RDataFrame("event", mc_rootfile)
 
-    particle_vars = [var for var in var_config.keys()]
+    particle_vars = var_list.copy()
     if mc_weight_config is not None:
         for var in mc_weight_config.values():
             particle_vars.append(var)
@@ -289,7 +319,7 @@ def process_single_bin(flat_bin_idx, binning_config, var_config, data_root_dir, 
     print(f"Loaded {len(comparer.sweight_map)} sWeights")
 
     print("Generating comparison plots...")
-    comparer.start_plotting(var_config, mc_weight_config)
+    comparer.start_plotting(var_list=var_list, weight_config=mc_weight_config, reweight_var=reweight_var)
 
     print(f"Bin {flat_bin_idx} completed. Plots saved to {bin_output_dir}")
     print("=" * 60 + "\n")

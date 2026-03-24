@@ -1,27 +1,18 @@
 #!/usr/bin/env python3
 """
-Generate LaTeX document to summarize data/MC comparison plots
-Each bin gets one page with:
-- 1 fit plot (from fit_result)
-- N comparison plots (user-configurable)
-
-Usage:
-    # With default phi settings
-    generate_latex_document()
-    
-    # With custom configuration
-    binning_config = {"Ks_z": [...], "Ks_pt": [...]}
-    var_labels = {"Ks_z": r"z", "Ks_pt": r"p_T"}
-    plot_labels = {"Ks_p": r"$p(K_S^0)$", "Ks_costheta": r"$\cos\theta(K_S^0)$", ...}
-    generate_latex_document(binning_config, plot_labels, var_labels=var_labels)
+Generate LaTeX document to summarize data/MC comparison plots.
+LaTeX labels come from config; caller only provides keys.
 """
 
 import os
 import glob
 import numpy as np
+from common.config.comparison import DEFAULT_PLOTS_PER_ROW, DEFAULT_WDITH_PER_PLOT
+from common.config.labels import DEFAULT_LATEX_PLOT_LABELS, DEFAULT_LATEX_VAR_LABELS
+from common.config.binning import DEFAULT_PHI_BINNING
 
-def generate_latex_document(binning_config=None, plot_labels=None, var_labels=None,
-                           title=None, output_file=None, fit_plot_dir=None, 
+def generate_latex_document(binning_config=None, comparison_plots=None,
+                           title=None, output_file=None, fit_plot_dir=None,
                            comparison_plot_dir=None, valid_bins=None):
     """
     Generate LaTeX document summarizing all bins
@@ -31,14 +22,9 @@ def generate_latex_document(binning_config=None, plot_labels=None, var_labels=No
     binning_config : dict, optional
         Dictionary mapping variable names to bin edge lists.
         Default: phi particle 3D binning in z, thrust_pt, helicity_angle
-    plot_labels : dict, optional
-        Dictionary mapping plot names to LaTeX labels for captions.
-        Plot names are derived from the keys of this dictionary.
-        Default: labels for phi and kaon kinematic plots (9 plots)
-    var_labels : dict, optional
-        Dictionary mapping variable names to their LaTeX representations.
-        Used for displaying bin definitions nicely.
-        Default: uses variable names as-is (e.g., 'phi_z' for phi particles)
+    comparison_plots : list, optional
+        Names of plots to include; labels resolved via config.
+        Default: keys from DEFAULT_LATEX_PLOT_LABELS
     title : str, optional
         Document title. Default: "Data/MC Comparison for $\\phi$ Spin Alignment Analysis"
     output_file : str, optional
@@ -56,36 +42,14 @@ def generate_latex_document(binning_config=None, plot_labels=None, var_labels=No
     
     # Default binning configuration for phi
     if binning_config is None:
-        binning_config = {
-            "phi_z": np.linspace(0.2, 1.0, 11).tolist(),
-            "phi_thrust_pt": [0.0, 0.125, 0.25, 0.375, 0.5, 0.6611, 0.8688, 1.1366, 1.4817, 1.9265, 2.5],
-            "phi_helicity_angle": np.linspace(-1.0, 1.0, 11).tolist()
-        }
-    
-    # Default plot labels (excluding phi_M)
-    if plot_labels is None:
-        plot_labels = {
-            "phi_p": r"$p(\phi)$",
-            "phi_costheta": r"$\cos\theta(\phi)$",
-            "phi_phi": r"$\varphi(\phi)$",
-            "kp_p": r"$p(K^+)$",
-            "km_p": r"$p(K^-)$",
-            "kp_costheta": r"$\cos\theta(K^+)$",
-            "km_costheta": r"$\cos\theta(K^-)$",
-            "kp_phi": r"$\varphi(K^+)$",
-            "km_phi": r"$\varphi(K^-)$"
-        }
-    
-    # Extract comparison plots from plot_labels keys
-    comparison_plots = list(plot_labels.keys())
-    
-    # Default variable labels for LaTeX presentation
-    if var_labels is None:
-        var_labels = {
-            "phi_z": r"z",
-            "phi_thrust_pt": r"p_T^{\rm thrust}",
-            "phi_helicity_angle": r"\cos\theta_{\rm hel}"
-        }
+        binning_config = DEFAULT_PHI_BINNING
+    # Plot names to include
+    if comparison_plots is None:
+        comparison_plots = list(DEFAULT_LATEX_PLOT_LABELS.keys())
+
+    # Resolve labels from config
+    plot_labels = {name: DEFAULT_LATEX_PLOT_LABELS.get(name, name) for name in comparison_plots}
+    var_labels = {name: DEFAULT_LATEX_VAR_LABELS.get(name, name) for name in binning_config.keys()}
     
     # Default title
     if title is None:
@@ -266,8 +230,8 @@ def generate_latex_document(binning_config=None, plot_labels=None, var_labels=No
         latex_content.append(r"  \centering")
         
         # Determine grid layout (3 plots per row)
-        plots_per_row = 3
-        width_per_plot = 0.32  # 32% width for 3 plots per row
+        plots_per_row = DEFAULT_PLOTS_PER_ROW
+        width_per_plot = DEFAULT_WDITH_PER_PLOT  # 32% width for 3 plots per row
         
         for i, plot_name in enumerate(comparison_plots):
             plot_file = os.path.join(bin_dir, f"{plot_name}.png")
