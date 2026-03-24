@@ -699,7 +699,7 @@ void EventClassify::init_event ( int* evtcls_flag, int* hadronic_flag )
   //*---
   // set initial values for trigger info.
   //*---
-  // add on "011001
+// add on "011001
    bhabha_trg     = -99;
    bhabha_pre_trg = -99;
    bhabha_cdcbb_trg = -99;
@@ -806,7 +806,7 @@ void EventClassify::fill_charged ( int good_track_type )
       it != ChgMgr.end(); ++it){
     Mdst_charged& Charged = *it;           // Get one track
     Mdst_trk& Trk = Charged.trk();         // Obtain pointer to MDST_trk
-    Mdst_trk_fit& Trkfit  = Trk.mhyp(2);   // get pointer to MDST_TRK_fit.
+    Mdst_trk_fit& Trkfit  = Trk.mhyp(2);   // get pointer to MDST_TRK_fit. // pion hyp.
 
     Hep3Vector P ( Charged.px(), Charged.py(), Charged.pz() ); 
     float cosine_trk = P.z()/P.mag();
@@ -820,14 +820,15 @@ void EventClassify::fill_charged ( int good_track_type )
       conf_level = prob_(Trkfit.chisq(),Trkfit.ndf());
     }      
 
+    // ---------------------------------------- used in hadronic event selection
     // track selection here.
     // P_t cut
-    if ( P.perp() >= P_t_cut ) {
-      if( cosine_trk > cos_trk_min && cosine_trk < cos_trk_max ){
-	if( Trkfit.nhits(3) >= Nsvd_cut ){
-	  if( abs(dr)< R_cut ){
-	    if( ( dz> Z_cut_min ) && (dz< Z_cut_max) ){
-	      if( good_track_type == 1 ){
+    if ( P.perp() >= P_t_cut ) { // pt > 0.1
+      if( cosine_trk > cos_trk_min && cosine_trk < cos_trk_max ){ // -1,1
+	if( Trkfit.nhits(3) >= Nsvd_cut ){ // nSVD hits >= 0
+	  if( abs(dr)< R_cut ){ // dr < 2 
+	    if( ( dz> Z_cut_min ) && (dz< Z_cut_max) ){ // |dz| < 4
+	      if( good_track_type == 1 ){ // not care , all appened later
 		if( conf_level > conf_cut ){
 
 		  // Register good track from CL cut.
@@ -845,7 +846,7 @@ void EventClassify::fill_charged ( int good_track_type )
 		TrkList.append ( Charged ); 
 	      }
 	    }
-
+      
 	    // track candidate for tau selection.
 	    if( (dz> Z_cut_min_tau) && (dz< Z_cut_max_tau) ){
 	      TrkListTau.append( Charged );
@@ -974,8 +975,8 @@ void EventClassify::fill_gamma ( void )
     Mdst_ecl& Ecl = Gamma.ecl();         // Obtain pointer to MDST_ecl
     Hep3Vector P ( Gamma.px(), Gamma.py(), Gamma.pz() ); 
     // Define momentum vector
-    if ( Ecl.quality() == 0 ) {       // identified as a good cluster
-      if ( P.mag() >= E_min_cut ) {         // E cut
+    if ( Ecl.quality() == 0 ) {       // identified as a good cluster // not matched to a track
+      if ( P.mag() >= E_min_cut ) {         // E cut // >0.1 GeV
 	//	GamList.push_back ( &Gamma );
  	GamList.append ( Gamma ); 
  	GamList_rest.append ( Gamma ); 
@@ -1044,6 +1045,7 @@ void EventClassify::fill_ecl ( void )
       //here save "track associated clusters for Mupair selection criteria
       if (cls.match() !=0) EclListTrack.append(new HepLorentzVector(P4) );
 
+    // ---------------------------------------- used in hadronic event selection
       // here save "good" clusters for hadronic selections.
       if( cls.energy() > E_min_cut ){
 	if( cls_theta >= ECLtheta_min && cls_theta <= ECLtheta_max )
@@ -1088,7 +1090,7 @@ void EventClassify::fill_ecl ( void )
 
 }
 
-// hadronic event selection.
+// ---------------------------------------- hadronic event selection
 void EventClassify::hadsel ( int* evtcls_flag, int* hadronic_flag, int output_level )
 {
 
@@ -1119,13 +1121,13 @@ void EventClassify::hadsel ( int* evtcls_flag, int* hadronic_flag, int output_le
 
     Hep3Vector P (TrkList[itrk]->px(),TrkList[itrk]->py(),
 		  TrkList[itrk]->pz());
-    double E =sqrt(P.mag2()+ pow(pi_mass,2.));
+    double E =sqrt(P.mag2()+ pow(pi_mass,2.)); // pion mass hype.
     HepLorentzVector P_cms(P,E);
     P_cms.boost(CMBoost);
     Psum += P.mag();
     Esum_chg += E;
     float ppcms = sqrt( pow(P_cms.e(),2.0) - P_cms.mag2() );
-    Psum_cms += sqrt( pow(P_cms.e(),2.0) - P_cms.mag2() );
+    Psum_cms += sqrt( pow(P_cms.e(),2.0) - P_cms.mag2() ); // p = sqrt(E^2 - m^2)
     Esum_chg_cms += P_cms.e();
     Pzsum += P_cms.pz();
 
@@ -1178,7 +1180,7 @@ void EventClassify::hadsel ( int* evtcls_flag, int* hadronic_flag, int output_le
   //*---
   // calculate neutral observables.
   //*---
-  int Ncls = GamList.length();
+  int Ncls = GamList.length(); // gamma:cluster list
 
   // dout(Debugout::DDEBUG,"EventClassify") << " #good clusters: " << Ncls <<std::endl;
 
@@ -1283,20 +1285,20 @@ void EventClassify::hadsel ( int* evtcls_flag, int* hadronic_flag, int output_le
   // add low multiplicity cut.    '99-May-14 I.Adachi
   // add primary vertex cut if quality >=2
   //                              '99-Jul-01 I.Adachi
-  if( Ntrk >= Ntrk_cut ){
-    if( (Evis_cms/ebeam) >= Ev_cut ){
-      if( abs(Pzsum/ebeam) <= Pz_cut ) {
+  if( Ntrk >= Ntrk_cut ){ // Ntrk >= 3
+    if( (Evis_cms/ebeam) >= Ev_cut ){ // Evis >= 0.2 * sqrt(s)
+      if( abs(Pzsum/ebeam) <= Pz_cut ) { // |Pzsum| <= 0.5 * sqrt(s)
 	if( (ECL_sum/ebeam) >= Esum_min_cut &&
-	    (ECL_sum/ebeam) <= Esum_max_cut ) {
+	    (ECL_sum/ebeam) <= Esum_max_cut ) {  // 0.025 <= Esum/sqrt(s)<= 0.9
 
 	  // if quality >= 2 case.
 	  if( VtxQuality >= 2 ){
 	    float PVr = sqrt( PrimaryVtx.x()*PrimaryVtx.x()+
 			      PrimaryVtx.y()*PrimaryVtx.y() );
 	    float PVz = PrimaryVtx.z();
-	    if( abs(PVr) <= PVr_cut && abs(PVz)<= PVz_cut ){
+	    if( abs(PVr) <= PVr_cut && abs(PVz)<= PVz_cut ){ // PrimeR < 1.5cm, |PrimeZ| < 3.5cm
 	  
-	      if( FWParam < 0.2 ){
+	      if( FWParam < 0.2 ){ //R2 < 0.2
 		evtcls_flag[0]   = 10;
 		hadronic_flag[0] = 10;
 	      }else{
@@ -1385,8 +1387,8 @@ void EventClassify::hadsel ( int* evtcls_flag, int* hadronic_flag, int output_le
   //*---
   if( evtcls_flag[0] >=10 ){
     if( (ECL_sum/ebeam) > ECLsumB_min &&
-	(ECL_sum/ebeam) < ECLsumB_max ) {
-      if( Necl_barrel >= Necl_cut ){
+	(ECL_sum/ebeam) < ECLsumB_max ) {  // 0.1 < Esum/sqrt(s)< 0.8
+      if( Necl_barrel >= Necl_cut ){  Necl > 1
 	if( FWParam < 0.2 ){
 	  hadronic_flag[1] = 10;
 	  evtcls_flag[13]  = 10;
@@ -1471,6 +1473,7 @@ void EventClassify::hadsel ( int* evtcls_flag, int* hadronic_flag, int output_le
     = Evtcls_hadron_info_Manager::get_manager();
   Evtcls_hadron_info& evtinfo = EvtInfoMgr.add();
   
+  // implementation of evtcls_hadron_info variables.
   evtinfo.Ntrk(Ntrk);
   evtinfo.Ncls(Ncls);
   evtinfo.Psum(Psum_cms);

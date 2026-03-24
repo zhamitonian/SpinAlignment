@@ -9,7 +9,8 @@ module register fix_mdst KsSpinAlignment_NullTest
 path create main
 path create Analysis
 
-path add_module main fix_mdst KsSpinAlignment_NullTest
+#path add_module main fix_mdst KsSpinAlignment_NullTest
+path add_module main fix_mdst
 
 path add_condition main >:0:Analysis
 path add_condition main =<:0:KILL
