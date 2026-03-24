@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 ############################################
-# b2bii test for hadronic selection
+# b2bii hadronic selection
 ############################################
 
 # Import and mdst loading
