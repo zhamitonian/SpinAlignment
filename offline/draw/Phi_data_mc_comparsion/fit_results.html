@@ -1,0 +1,5795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fit Results Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        
+        .header h1 {
+            margin-bottom: 10px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .controls label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .controls input, .controls select {
+            padding: 5px 10px;
+            border-radius: 3px;
+            border: 1px solid #ccc;
+        }
+        
+        #searchBox {
+            width: 200px;
+        }
+        
+        .stats {
+            color: #ecf0f1;
+            font-size: 14px;
+        }
+        
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .image-card {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .image-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+        }
+        
+        .image-card.hidden {
+            display: none;
+        }
+        
+        .image-header {
+            background-color: #34495e;
+            color: white;
+            padding: 10px 15px;
+            font-weight: bold;
+        }
+        
+        .image-container {
+            position: relative;
+            cursor: pointer;
+        }
+        
+        .image-container img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        
+        /* Modal for full-size image */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.9);
+        }
+        
+        .modal-content {
+            margin: auto;
+            display: block;
+            max-width: 95%;
+            max-height: 95%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .close {
+            position: absolute;
+            top: 15px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: #ff0000;
+        }
+        
+        .nav-buttons {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 40px;
+            color: white;
+            cursor: pointer;
+            padding: 20px;
+            user-select: none;
+        }
+        
+        .nav-buttons:hover {
+            background-color: rgba(255,255,255,0.1);
+        }
+        
+        .prev {
+            left: 20px;
+        }
+        
+        .next {
+            right: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .gallery {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Fit Results Viewer</h1>
+        <div class="controls">
+            <label>
+                Search Bin:
+                <input type="text" id="searchBox" placeholder="e.g., 247">
+            </label>
+            <label>
+                Images per row:
+                <select id="columnsSelect">
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3" selected>3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                </select>
+            </label>
+            <span class="stats">
+                Showing <span id="visibleCount">0</span> of <span id="totalCount">0</span> images
+            </span>
+        </div>
+    </div>
+    
+    <div class="gallery" id="gallery">
+        <!-- Images will be inserted here -->
+    </div>
+    
+    <!-- Modal for full-size image -->
+    <div id="imageModal" class="modal">
+        <span class="close">&times;</span>
+        <span class="nav-buttons prev">&#10094;</span>
+        <span class="nav-buttons next">&#10095;</span>
+        <img class="modal-content" id="modalImage">
+    </div>
+    
+    <script>
+        // Image data
+        const images = [
+            {
+                src: "fit_result/bin_000_phi_M.png",
+                bin: 0,
+                label: "Bin 0",
+                filename: "bin_000_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_001_phi_M.png",
+                bin: 1,
+                label: "Bin 1",
+                filename: "bin_001_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_002_phi_M.png",
+                bin: 2,
+                label: "Bin 2",
+                filename: "bin_002_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_003_phi_M.png",
+                bin: 3,
+                label: "Bin 3",
+                filename: "bin_003_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_004_phi_M.png",
+                bin: 4,
+                label: "Bin 4",
+                filename: "bin_004_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_005_phi_M.png",
+                bin: 5,
+                label: "Bin 5",
+                filename: "bin_005_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_006_phi_M.png",
+                bin: 6,
+                label: "Bin 6",
+                filename: "bin_006_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_007_phi_M.png",
+                bin: 7,
+                label: "Bin 7",
+                filename: "bin_007_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_008_phi_M.png",
+                bin: 8,
+                label: "Bin 8",
+                filename: "bin_008_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_009_phi_M.png",
+                bin: 9,
+                label: "Bin 9",
+                filename: "bin_009_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_010_phi_M.png",
+                bin: 10,
+                label: "Bin 10",
+                filename: "bin_010_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_011_phi_M.png",
+                bin: 11,
+                label: "Bin 11",
+                filename: "bin_011_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_012_phi_M.png",
+                bin: 12,
+                label: "Bin 12",
+                filename: "bin_012_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_013_phi_M.png",
+                bin: 13,
+                label: "Bin 13",
+                filename: "bin_013_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_014_phi_M.png",
+                bin: 14,
+                label: "Bin 14",
+                filename: "bin_014_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_015_phi_M.png",
+                bin: 15,
+                label: "Bin 15",
+                filename: "bin_015_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_016_phi_M.png",
+                bin: 16,
+                label: "Bin 16",
+                filename: "bin_016_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_017_phi_M.png",
+                bin: 17,
+                label: "Bin 17",
+                filename: "bin_017_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_018_phi_M.png",
+                bin: 18,
+                label: "Bin 18",
+                filename: "bin_018_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_019_phi_M.png",
+                bin: 19,
+                label: "Bin 19",
+                filename: "bin_019_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_020_phi_M.png",
+                bin: 20,
+                label: "Bin 20",
+                filename: "bin_020_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_021_phi_M.png",
+                bin: 21,
+                label: "Bin 21",
+                filename: "bin_021_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_022_phi_M.png",
+                bin: 22,
+                label: "Bin 22",
+                filename: "bin_022_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_023_phi_M.png",
+                bin: 23,
+                label: "Bin 23",
+                filename: "bin_023_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_024_phi_M.png",
+                bin: 24,
+                label: "Bin 24",
+                filename: "bin_024_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_025_phi_M.png",
+                bin: 25,
+                label: "Bin 25",
+                filename: "bin_025_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_026_phi_M.png",
+                bin: 26,
+                label: "Bin 26",
+                filename: "bin_026_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_027_phi_M.png",
+                bin: 27,
+                label: "Bin 27",
+                filename: "bin_027_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_028_phi_M.png",
+                bin: 28,
+                label: "Bin 28",
+                filename: "bin_028_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_029_phi_M.png",
+                bin: 29,
+                label: "Bin 29",
+                filename: "bin_029_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_030_phi_M.png",
+                bin: 30,
+                label: "Bin 30",
+                filename: "bin_030_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_031_phi_M.png",
+                bin: 31,
+                label: "Bin 31",
+                filename: "bin_031_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_032_phi_M.png",
+                bin: 32,
+                label: "Bin 32",
+                filename: "bin_032_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_033_phi_M.png",
+                bin: 33,
+                label: "Bin 33",
+                filename: "bin_033_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_034_phi_M.png",
+                bin: 34,
+                label: "Bin 34",
+                filename: "bin_034_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_035_phi_M.png",
+                bin: 35,
+                label: "Bin 35",
+                filename: "bin_035_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_036_phi_M.png",
+                bin: 36,
+                label: "Bin 36",
+                filename: "bin_036_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_037_phi_M.png",
+                bin: 37,
+                label: "Bin 37",
+                filename: "bin_037_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_038_phi_M.png",
+                bin: 38,
+                label: "Bin 38",
+                filename: "bin_038_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_039_phi_M.png",
+                bin: 39,
+                label: "Bin 39",
+                filename: "bin_039_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_040_phi_M.png",
+                bin: 40,
+                label: "Bin 40",
+                filename: "bin_040_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_041_phi_M.png",
+                bin: 41,
+                label: "Bin 41",
+                filename: "bin_041_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_042_phi_M.png",
+                bin: 42,
+                label: "Bin 42",
+                filename: "bin_042_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_043_phi_M.png",
+                bin: 43,
+                label: "Bin 43",
+                filename: "bin_043_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_044_phi_M.png",
+                bin: 44,
+                label: "Bin 44",
+                filename: "bin_044_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_045_phi_M.png",
+                bin: 45,
+                label: "Bin 45",
+                filename: "bin_045_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_046_phi_M.png",
+                bin: 46,
+                label: "Bin 46",
+                filename: "bin_046_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_047_phi_M.png",
+                bin: 47,
+                label: "Bin 47",
+                filename: "bin_047_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_048_phi_M.png",
+                bin: 48,
+                label: "Bin 48",
+                filename: "bin_048_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_049_phi_M.png",
+                bin: 49,
+                label: "Bin 49",
+                filename: "bin_049_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_050_phi_M.png",
+                bin: 50,
+                label: "Bin 50",
+                filename: "bin_050_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_051_phi_M.png",
+                bin: 51,
+                label: "Bin 51",
+                filename: "bin_051_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_052_phi_M.png",
+                bin: 52,
+                label: "Bin 52",
+                filename: "bin_052_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_053_phi_M.png",
+                bin: 53,
+                label: "Bin 53",
+                filename: "bin_053_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_054_phi_M.png",
+                bin: 54,
+                label: "Bin 54",
+                filename: "bin_054_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_055_phi_M.png",
+                bin: 55,
+                label: "Bin 55",
+                filename: "bin_055_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_056_phi_M.png",
+                bin: 56,
+                label: "Bin 56",
+                filename: "bin_056_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_057_phi_M.png",
+                bin: 57,
+                label: "Bin 57",
+                filename: "bin_057_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_058_phi_M.png",
+                bin: 58,
+                label: "Bin 58",
+                filename: "bin_058_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_059_phi_M.png",
+                bin: 59,
+                label: "Bin 59",
+                filename: "bin_059_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_060_phi_M.png",
+                bin: 60,
+                label: "Bin 60",
+                filename: "bin_060_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_061_phi_M.png",
+                bin: 61,
+                label: "Bin 61",
+                filename: "bin_061_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_062_phi_M.png",
+                bin: 62,
+                label: "Bin 62",
+                filename: "bin_062_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_063_phi_M.png",
+                bin: 63,
+                label: "Bin 63",
+                filename: "bin_063_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_064_phi_M.png",
+                bin: 64,
+                label: "Bin 64",
+                filename: "bin_064_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_065_phi_M.png",
+                bin: 65,
+                label: "Bin 65",
+                filename: "bin_065_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_066_phi_M.png",
+                bin: 66,
+                label: "Bin 66",
+                filename: "bin_066_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_067_phi_M.png",
+                bin: 67,
+                label: "Bin 67",
+                filename: "bin_067_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_068_phi_M.png",
+                bin: 68,
+                label: "Bin 68",
+                filename: "bin_068_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_069_phi_M.png",
+                bin: 69,
+                label: "Bin 69",
+                filename: "bin_069_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_100_phi_M.png",
+                bin: 100,
+                label: "Bin 100",
+                filename: "bin_100_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_101_phi_M.png",
+                bin: 101,
+                label: "Bin 101",
+                filename: "bin_101_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_102_phi_M.png",
+                bin: 102,
+                label: "Bin 102",
+                filename: "bin_102_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_103_phi_M.png",
+                bin: 103,
+                label: "Bin 103",
+                filename: "bin_103_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_104_phi_M.png",
+                bin: 104,
+                label: "Bin 104",
+                filename: "bin_104_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_105_phi_M.png",
+                bin: 105,
+                label: "Bin 105",
+                filename: "bin_105_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_106_phi_M.png",
+                bin: 106,
+                label: "Bin 106",
+                filename: "bin_106_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_107_phi_M.png",
+                bin: 107,
+                label: "Bin 107",
+                filename: "bin_107_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_108_phi_M.png",
+                bin: 108,
+                label: "Bin 108",
+                filename: "bin_108_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_109_phi_M.png",
+                bin: 109,
+                label: "Bin 109",
+                filename: "bin_109_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_110_phi_M.png",
+                bin: 110,
+                label: "Bin 110",
+                filename: "bin_110_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_111_phi_M.png",
+                bin: 111,
+                label: "Bin 111",
+                filename: "bin_111_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_112_phi_M.png",
+                bin: 112,
+                label: "Bin 112",
+                filename: "bin_112_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_113_phi_M.png",
+                bin: 113,
+                label: "Bin 113",
+                filename: "bin_113_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_114_phi_M.png",
+                bin: 114,
+                label: "Bin 114",
+                filename: "bin_114_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_115_phi_M.png",
+                bin: 115,
+                label: "Bin 115",
+                filename: "bin_115_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_116_phi_M.png",
+                bin: 116,
+                label: "Bin 116",
+                filename: "bin_116_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_117_phi_M.png",
+                bin: 117,
+                label: "Bin 117",
+                filename: "bin_117_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_118_phi_M.png",
+                bin: 118,
+                label: "Bin 118",
+                filename: "bin_118_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_119_phi_M.png",
+                bin: 119,
+                label: "Bin 119",
+                filename: "bin_119_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_120_phi_M.png",
+                bin: 120,
+                label: "Bin 120",
+                filename: "bin_120_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_121_phi_M.png",
+                bin: 121,
+                label: "Bin 121",
+                filename: "bin_121_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_122_phi_M.png",
+                bin: 122,
+                label: "Bin 122",
+                filename: "bin_122_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_123_phi_M.png",
+                bin: 123,
+                label: "Bin 123",
+                filename: "bin_123_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_124_phi_M.png",
+                bin: 124,
+                label: "Bin 124",
+                filename: "bin_124_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_125_phi_M.png",
+                bin: 125,
+                label: "Bin 125",
+                filename: "bin_125_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_126_phi_M.png",
+                bin: 126,
+                label: "Bin 126",
+                filename: "bin_126_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_127_phi_M.png",
+                bin: 127,
+                label: "Bin 127",
+                filename: "bin_127_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_128_phi_M.png",
+                bin: 128,
+                label: "Bin 128",
+                filename: "bin_128_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_129_phi_M.png",
+                bin: 129,
+                label: "Bin 129",
+                filename: "bin_129_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_130_phi_M.png",
+                bin: 130,
+                label: "Bin 130",
+                filename: "bin_130_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_131_phi_M.png",
+                bin: 131,
+                label: "Bin 131",
+                filename: "bin_131_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_132_phi_M.png",
+                bin: 132,
+                label: "Bin 132",
+                filename: "bin_132_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_133_phi_M.png",
+                bin: 133,
+                label: "Bin 133",
+                filename: "bin_133_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_134_phi_M.png",
+                bin: 134,
+                label: "Bin 134",
+                filename: "bin_134_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_135_phi_M.png",
+                bin: 135,
+                label: "Bin 135",
+                filename: "bin_135_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_136_phi_M.png",
+                bin: 136,
+                label: "Bin 136",
+                filename: "bin_136_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_137_phi_M.png",
+                bin: 137,
+                label: "Bin 137",
+                filename: "bin_137_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_138_phi_M.png",
+                bin: 138,
+                label: "Bin 138",
+                filename: "bin_138_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_139_phi_M.png",
+                bin: 139,
+                label: "Bin 139",
+                filename: "bin_139_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_140_phi_M.png",
+                bin: 140,
+                label: "Bin 140",
+                filename: "bin_140_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_141_phi_M.png",
+                bin: 141,
+                label: "Bin 141",
+                filename: "bin_141_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_142_phi_M.png",
+                bin: 142,
+                label: "Bin 142",
+                filename: "bin_142_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_143_phi_M.png",
+                bin: 143,
+                label: "Bin 143",
+                filename: "bin_143_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_144_phi_M.png",
+                bin: 144,
+                label: "Bin 144",
+                filename: "bin_144_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_145_phi_M.png",
+                bin: 145,
+                label: "Bin 145",
+                filename: "bin_145_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_146_phi_M.png",
+                bin: 146,
+                label: "Bin 146",
+                filename: "bin_146_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_147_phi_M.png",
+                bin: 147,
+                label: "Bin 147",
+                filename: "bin_147_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_148_phi_M.png",
+                bin: 148,
+                label: "Bin 148",
+                filename: "bin_148_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_149_phi_M.png",
+                bin: 149,
+                label: "Bin 149",
+                filename: "bin_149_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_150_phi_M.png",
+                bin: 150,
+                label: "Bin 150",
+                filename: "bin_150_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_151_phi_M.png",
+                bin: 151,
+                label: "Bin 151",
+                filename: "bin_151_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_152_phi_M.png",
+                bin: 152,
+                label: "Bin 152",
+                filename: "bin_152_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_153_phi_M.png",
+                bin: 153,
+                label: "Bin 153",
+                filename: "bin_153_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_154_phi_M.png",
+                bin: 154,
+                label: "Bin 154",
+                filename: "bin_154_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_155_phi_M.png",
+                bin: 155,
+                label: "Bin 155",
+                filename: "bin_155_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_156_phi_M.png",
+                bin: 156,
+                label: "Bin 156",
+                filename: "bin_156_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_157_phi_M.png",
+                bin: 157,
+                label: "Bin 157",
+                filename: "bin_157_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_158_phi_M.png",
+                bin: 158,
+                label: "Bin 158",
+                filename: "bin_158_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_159_phi_M.png",
+                bin: 159,
+                label: "Bin 159",
+                filename: "bin_159_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_160_phi_M.png",
+                bin: 160,
+                label: "Bin 160",
+                filename: "bin_160_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_161_phi_M.png",
+                bin: 161,
+                label: "Bin 161",
+                filename: "bin_161_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_162_phi_M.png",
+                bin: 162,
+                label: "Bin 162",
+                filename: "bin_162_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_163_phi_M.png",
+                bin: 163,
+                label: "Bin 163",
+                filename: "bin_163_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_164_phi_M.png",
+                bin: 164,
+                label: "Bin 164",
+                filename: "bin_164_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_165_phi_M.png",
+                bin: 165,
+                label: "Bin 165",
+                filename: "bin_165_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_166_phi_M.png",
+                bin: 166,
+                label: "Bin 166",
+                filename: "bin_166_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_167_phi_M.png",
+                bin: 167,
+                label: "Bin 167",
+                filename: "bin_167_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_168_phi_M.png",
+                bin: 168,
+                label: "Bin 168",
+                filename: "bin_168_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_169_phi_M.png",
+                bin: 169,
+                label: "Bin 169",
+                filename: "bin_169_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_170_phi_M.png",
+                bin: 170,
+                label: "Bin 170",
+                filename: "bin_170_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_171_phi_M.png",
+                bin: 171,
+                label: "Bin 171",
+                filename: "bin_171_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_172_phi_M.png",
+                bin: 172,
+                label: "Bin 172",
+                filename: "bin_172_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_173_phi_M.png",
+                bin: 173,
+                label: "Bin 173",
+                filename: "bin_173_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_174_phi_M.png",
+                bin: 174,
+                label: "Bin 174",
+                filename: "bin_174_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_175_phi_M.png",
+                bin: 175,
+                label: "Bin 175",
+                filename: "bin_175_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_176_phi_M.png",
+                bin: 176,
+                label: "Bin 176",
+                filename: "bin_176_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_177_phi_M.png",
+                bin: 177,
+                label: "Bin 177",
+                filename: "bin_177_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_178_phi_M.png",
+                bin: 178,
+                label: "Bin 178",
+                filename: "bin_178_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_179_phi_M.png",
+                bin: 179,
+                label: "Bin 179",
+                filename: "bin_179_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_180_phi_M.png",
+                bin: 180,
+                label: "Bin 180",
+                filename: "bin_180_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_181_phi_M.png",
+                bin: 181,
+                label: "Bin 181",
+                filename: "bin_181_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_182_phi_M.png",
+                bin: 182,
+                label: "Bin 182",
+                filename: "bin_182_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_183_phi_M.png",
+                bin: 183,
+                label: "Bin 183",
+                filename: "bin_183_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_184_phi_M.png",
+                bin: 184,
+                label: "Bin 184",
+                filename: "bin_184_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_185_phi_M.png",
+                bin: 185,
+                label: "Bin 185",
+                filename: "bin_185_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_186_phi_M.png",
+                bin: 186,
+                label: "Bin 186",
+                filename: "bin_186_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_187_phi_M.png",
+                bin: 187,
+                label: "Bin 187",
+                filename: "bin_187_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_188_phi_M.png",
+                bin: 188,
+                label: "Bin 188",
+                filename: "bin_188_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_189_phi_M.png",
+                bin: 189,
+                label: "Bin 189",
+                filename: "bin_189_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_200_phi_M.png",
+                bin: 200,
+                label: "Bin 200",
+                filename: "bin_200_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_201_phi_M.png",
+                bin: 201,
+                label: "Bin 201",
+                filename: "bin_201_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_202_phi_M.png",
+                bin: 202,
+                label: "Bin 202",
+                filename: "bin_202_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_203_phi_M.png",
+                bin: 203,
+                label: "Bin 203",
+                filename: "bin_203_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_204_phi_M.png",
+                bin: 204,
+                label: "Bin 204",
+                filename: "bin_204_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_205_phi_M.png",
+                bin: 205,
+                label: "Bin 205",
+                filename: "bin_205_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_206_phi_M.png",
+                bin: 206,
+                label: "Bin 206",
+                filename: "bin_206_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_207_phi_M.png",
+                bin: 207,
+                label: "Bin 207",
+                filename: "bin_207_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_208_phi_M.png",
+                bin: 208,
+                label: "Bin 208",
+                filename: "bin_208_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_209_phi_M.png",
+                bin: 209,
+                label: "Bin 209",
+                filename: "bin_209_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_210_phi_M.png",
+                bin: 210,
+                label: "Bin 210",
+                filename: "bin_210_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_211_phi_M.png",
+                bin: 211,
+                label: "Bin 211",
+                filename: "bin_211_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_212_phi_M.png",
+                bin: 212,
+                label: "Bin 212",
+                filename: "bin_212_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_213_phi_M.png",
+                bin: 213,
+                label: "Bin 213",
+                filename: "bin_213_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_214_phi_M.png",
+                bin: 214,
+                label: "Bin 214",
+                filename: "bin_214_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_215_phi_M.png",
+                bin: 215,
+                label: "Bin 215",
+                filename: "bin_215_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_216_phi_M.png",
+                bin: 216,
+                label: "Bin 216",
+                filename: "bin_216_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_217_phi_M.png",
+                bin: 217,
+                label: "Bin 217",
+                filename: "bin_217_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_218_phi_M.png",
+                bin: 218,
+                label: "Bin 218",
+                filename: "bin_218_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_219_phi_M.png",
+                bin: 219,
+                label: "Bin 219",
+                filename: "bin_219_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_220_phi_M.png",
+                bin: 220,
+                label: "Bin 220",
+                filename: "bin_220_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_221_phi_M.png",
+                bin: 221,
+                label: "Bin 221",
+                filename: "bin_221_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_222_phi_M.png",
+                bin: 222,
+                label: "Bin 222",
+                filename: "bin_222_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_223_phi_M.png",
+                bin: 223,
+                label: "Bin 223",
+                filename: "bin_223_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_224_phi_M.png",
+                bin: 224,
+                label: "Bin 224",
+                filename: "bin_224_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_225_phi_M.png",
+                bin: 225,
+                label: "Bin 225",
+                filename: "bin_225_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_226_phi_M.png",
+                bin: 226,
+                label: "Bin 226",
+                filename: "bin_226_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_227_phi_M.png",
+                bin: 227,
+                label: "Bin 227",
+                filename: "bin_227_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_228_phi_M.png",
+                bin: 228,
+                label: "Bin 228",
+                filename: "bin_228_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_229_phi_M.png",
+                bin: 229,
+                label: "Bin 229",
+                filename: "bin_229_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_230_phi_M.png",
+                bin: 230,
+                label: "Bin 230",
+                filename: "bin_230_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_231_phi_M.png",
+                bin: 231,
+                label: "Bin 231",
+                filename: "bin_231_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_232_phi_M.png",
+                bin: 232,
+                label: "Bin 232",
+                filename: "bin_232_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_233_phi_M.png",
+                bin: 233,
+                label: "Bin 233",
+                filename: "bin_233_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_234_phi_M.png",
+                bin: 234,
+                label: "Bin 234",
+                filename: "bin_234_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_235_phi_M.png",
+                bin: 235,
+                label: "Bin 235",
+                filename: "bin_235_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_236_phi_M.png",
+                bin: 236,
+                label: "Bin 236",
+                filename: "bin_236_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_237_phi_M.png",
+                bin: 237,
+                label: "Bin 237",
+                filename: "bin_237_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_238_phi_M.png",
+                bin: 238,
+                label: "Bin 238",
+                filename: "bin_238_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_239_phi_M.png",
+                bin: 239,
+                label: "Bin 239",
+                filename: "bin_239_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_240_phi_M.png",
+                bin: 240,
+                label: "Bin 240",
+                filename: "bin_240_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_241_phi_M.png",
+                bin: 241,
+                label: "Bin 241",
+                filename: "bin_241_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_242_phi_M.png",
+                bin: 242,
+                label: "Bin 242",
+                filename: "bin_242_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_243_phi_M.png",
+                bin: 243,
+                label: "Bin 243",
+                filename: "bin_243_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_244_phi_M.png",
+                bin: 244,
+                label: "Bin 244",
+                filename: "bin_244_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_245_phi_M.png",
+                bin: 245,
+                label: "Bin 245",
+                filename: "bin_245_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_246_phi_M.png",
+                bin: 246,
+                label: "Bin 246",
+                filename: "bin_246_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_247_phi_M.png",
+                bin: 247,
+                label: "Bin 247",
+                filename: "bin_247_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_248_phi_M.png",
+                bin: 248,
+                label: "Bin 248",
+                filename: "bin_248_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_249_phi_M.png",
+                bin: 249,
+                label: "Bin 249",
+                filename: "bin_249_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_250_phi_M.png",
+                bin: 250,
+                label: "Bin 250",
+                filename: "bin_250_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_251_phi_M.png",
+                bin: 251,
+                label: "Bin 251",
+                filename: "bin_251_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_252_phi_M.png",
+                bin: 252,
+                label: "Bin 252",
+                filename: "bin_252_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_253_phi_M.png",
+                bin: 253,
+                label: "Bin 253",
+                filename: "bin_253_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_254_phi_M.png",
+                bin: 254,
+                label: "Bin 254",
+                filename: "bin_254_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_255_phi_M.png",
+                bin: 255,
+                label: "Bin 255",
+                filename: "bin_255_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_256_phi_M.png",
+                bin: 256,
+                label: "Bin 256",
+                filename: "bin_256_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_257_phi_M.png",
+                bin: 257,
+                label: "Bin 257",
+                filename: "bin_257_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_258_phi_M.png",
+                bin: 258,
+                label: "Bin 258",
+                filename: "bin_258_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_259_phi_M.png",
+                bin: 259,
+                label: "Bin 259",
+                filename: "bin_259_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_260_phi_M.png",
+                bin: 260,
+                label: "Bin 260",
+                filename: "bin_260_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_261_phi_M.png",
+                bin: 261,
+                label: "Bin 261",
+                filename: "bin_261_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_262_phi_M.png",
+                bin: 262,
+                label: "Bin 262",
+                filename: "bin_262_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_263_phi_M.png",
+                bin: 263,
+                label: "Bin 263",
+                filename: "bin_263_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_264_phi_M.png",
+                bin: 264,
+                label: "Bin 264",
+                filename: "bin_264_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_265_phi_M.png",
+                bin: 265,
+                label: "Bin 265",
+                filename: "bin_265_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_266_phi_M.png",
+                bin: 266,
+                label: "Bin 266",
+                filename: "bin_266_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_267_phi_M.png",
+                bin: 267,
+                label: "Bin 267",
+                filename: "bin_267_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_268_phi_M.png",
+                bin: 268,
+                label: "Bin 268",
+                filename: "bin_268_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_269_phi_M.png",
+                bin: 269,
+                label: "Bin 269",
+                filename: "bin_269_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_270_phi_M.png",
+                bin: 270,
+                label: "Bin 270",
+                filename: "bin_270_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_271_phi_M.png",
+                bin: 271,
+                label: "Bin 271",
+                filename: "bin_271_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_272_phi_M.png",
+                bin: 272,
+                label: "Bin 272",
+                filename: "bin_272_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_273_phi_M.png",
+                bin: 273,
+                label: "Bin 273",
+                filename: "bin_273_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_274_phi_M.png",
+                bin: 274,
+                label: "Bin 274",
+                filename: "bin_274_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_275_phi_M.png",
+                bin: 275,
+                label: "Bin 275",
+                filename: "bin_275_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_276_phi_M.png",
+                bin: 276,
+                label: "Bin 276",
+                filename: "bin_276_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_277_phi_M.png",
+                bin: 277,
+                label: "Bin 277",
+                filename: "bin_277_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_278_phi_M.png",
+                bin: 278,
+                label: "Bin 278",
+                filename: "bin_278_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_279_phi_M.png",
+                bin: 279,
+                label: "Bin 279",
+                filename: "bin_279_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_280_phi_M.png",
+                bin: 280,
+                label: "Bin 280",
+                filename: "bin_280_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_281_phi_M.png",
+                bin: 281,
+                label: "Bin 281",
+                filename: "bin_281_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_282_phi_M.png",
+                bin: 282,
+                label: "Bin 282",
+                filename: "bin_282_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_283_phi_M.png",
+                bin: 283,
+                label: "Bin 283",
+                filename: "bin_283_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_284_phi_M.png",
+                bin: 284,
+                label: "Bin 284",
+                filename: "bin_284_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_285_phi_M.png",
+                bin: 285,
+                label: "Bin 285",
+                filename: "bin_285_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_286_phi_M.png",
+                bin: 286,
+                label: "Bin 286",
+                filename: "bin_286_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_287_phi_M.png",
+                bin: 287,
+                label: "Bin 287",
+                filename: "bin_287_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_288_phi_M.png",
+                bin: 288,
+                label: "Bin 288",
+                filename: "bin_288_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_289_phi_M.png",
+                bin: 289,
+                label: "Bin 289",
+                filename: "bin_289_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_291_phi_M.png",
+                bin: 291,
+                label: "Bin 291",
+                filename: "bin_291_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_293_phi_M.png",
+                bin: 293,
+                label: "Bin 293",
+                filename: "bin_293_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_295_phi_M.png",
+                bin: 295,
+                label: "Bin 295",
+                filename: "bin_295_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_297_phi_M.png",
+                bin: 297,
+                label: "Bin 297",
+                filename: "bin_297_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_298_phi_M.png",
+                bin: 298,
+                label: "Bin 298",
+                filename: "bin_298_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_299_phi_M.png",
+                bin: 299,
+                label: "Bin 299",
+                filename: "bin_299_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_300_phi_M.png",
+                bin: 300,
+                label: "Bin 300",
+                filename: "bin_300_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_301_phi_M.png",
+                bin: 301,
+                label: "Bin 301",
+                filename: "bin_301_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_302_phi_M.png",
+                bin: 302,
+                label: "Bin 302",
+                filename: "bin_302_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_303_phi_M.png",
+                bin: 303,
+                label: "Bin 303",
+                filename: "bin_303_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_304_phi_M.png",
+                bin: 304,
+                label: "Bin 304",
+                filename: "bin_304_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_305_phi_M.png",
+                bin: 305,
+                label: "Bin 305",
+                filename: "bin_305_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_306_phi_M.png",
+                bin: 306,
+                label: "Bin 306",
+                filename: "bin_306_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_307_phi_M.png",
+                bin: 307,
+                label: "Bin 307",
+                filename: "bin_307_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_308_phi_M.png",
+                bin: 308,
+                label: "Bin 308",
+                filename: "bin_308_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_309_phi_M.png",
+                bin: 309,
+                label: "Bin 309",
+                filename: "bin_309_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_310_phi_M.png",
+                bin: 310,
+                label: "Bin 310",
+                filename: "bin_310_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_311_phi_M.png",
+                bin: 311,
+                label: "Bin 311",
+                filename: "bin_311_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_312_phi_M.png",
+                bin: 312,
+                label: "Bin 312",
+                filename: "bin_312_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_313_phi_M.png",
+                bin: 313,
+                label: "Bin 313",
+                filename: "bin_313_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_314_phi_M.png",
+                bin: 314,
+                label: "Bin 314",
+                filename: "bin_314_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_315_phi_M.png",
+                bin: 315,
+                label: "Bin 315",
+                filename: "bin_315_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_316_phi_M.png",
+                bin: 316,
+                label: "Bin 316",
+                filename: "bin_316_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_317_phi_M.png",
+                bin: 317,
+                label: "Bin 317",
+                filename: "bin_317_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_318_phi_M.png",
+                bin: 318,
+                label: "Bin 318",
+                filename: "bin_318_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_319_phi_M.png",
+                bin: 319,
+                label: "Bin 319",
+                filename: "bin_319_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_320_phi_M.png",
+                bin: 320,
+                label: "Bin 320",
+                filename: "bin_320_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_321_phi_M.png",
+                bin: 321,
+                label: "Bin 321",
+                filename: "bin_321_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_322_phi_M.png",
+                bin: 322,
+                label: "Bin 322",
+                filename: "bin_322_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_323_phi_M.png",
+                bin: 323,
+                label: "Bin 323",
+                filename: "bin_323_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_324_phi_M.png",
+                bin: 324,
+                label: "Bin 324",
+                filename: "bin_324_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_325_phi_M.png",
+                bin: 325,
+                label: "Bin 325",
+                filename: "bin_325_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_326_phi_M.png",
+                bin: 326,
+                label: "Bin 326",
+                filename: "bin_326_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_327_phi_M.png",
+                bin: 327,
+                label: "Bin 327",
+                filename: "bin_327_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_328_phi_M.png",
+                bin: 328,
+                label: "Bin 328",
+                filename: "bin_328_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_329_phi_M.png",
+                bin: 329,
+                label: "Bin 329",
+                filename: "bin_329_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_330_phi_M.png",
+                bin: 330,
+                label: "Bin 330",
+                filename: "bin_330_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_331_phi_M.png",
+                bin: 331,
+                label: "Bin 331",
+                filename: "bin_331_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_332_phi_M.png",
+                bin: 332,
+                label: "Bin 332",
+                filename: "bin_332_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_333_phi_M.png",
+                bin: 333,
+                label: "Bin 333",
+                filename: "bin_333_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_334_phi_M.png",
+                bin: 334,
+                label: "Bin 334",
+                filename: "bin_334_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_335_phi_M.png",
+                bin: 335,
+                label: "Bin 335",
+                filename: "bin_335_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_336_phi_M.png",
+                bin: 336,
+                label: "Bin 336",
+                filename: "bin_336_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_337_phi_M.png",
+                bin: 337,
+                label: "Bin 337",
+                filename: "bin_337_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_338_phi_M.png",
+                bin: 338,
+                label: "Bin 338",
+                filename: "bin_338_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_339_phi_M.png",
+                bin: 339,
+                label: "Bin 339",
+                filename: "bin_339_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_340_phi_M.png",
+                bin: 340,
+                label: "Bin 340",
+                filename: "bin_340_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_341_phi_M.png",
+                bin: 341,
+                label: "Bin 341",
+                filename: "bin_341_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_342_phi_M.png",
+                bin: 342,
+                label: "Bin 342",
+                filename: "bin_342_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_343_phi_M.png",
+                bin: 343,
+                label: "Bin 343",
+                filename: "bin_343_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_344_phi_M.png",
+                bin: 344,
+                label: "Bin 344",
+                filename: "bin_344_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_345_phi_M.png",
+                bin: 345,
+                label: "Bin 345",
+                filename: "bin_345_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_346_phi_M.png",
+                bin: 346,
+                label: "Bin 346",
+                filename: "bin_346_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_347_phi_M.png",
+                bin: 347,
+                label: "Bin 347",
+                filename: "bin_347_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_348_phi_M.png",
+                bin: 348,
+                label: "Bin 348",
+                filename: "bin_348_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_349_phi_M.png",
+                bin: 349,
+                label: "Bin 349",
+                filename: "bin_349_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_350_phi_M.png",
+                bin: 350,
+                label: "Bin 350",
+                filename: "bin_350_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_351_phi_M.png",
+                bin: 351,
+                label: "Bin 351",
+                filename: "bin_351_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_352_phi_M.png",
+                bin: 352,
+                label: "Bin 352",
+                filename: "bin_352_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_353_phi_M.png",
+                bin: 353,
+                label: "Bin 353",
+                filename: "bin_353_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_354_phi_M.png",
+                bin: 354,
+                label: "Bin 354",
+                filename: "bin_354_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_355_phi_M.png",
+                bin: 355,
+                label: "Bin 355",
+                filename: "bin_355_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_356_phi_M.png",
+                bin: 356,
+                label: "Bin 356",
+                filename: "bin_356_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_357_phi_M.png",
+                bin: 357,
+                label: "Bin 357",
+                filename: "bin_357_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_358_phi_M.png",
+                bin: 358,
+                label: "Bin 358",
+                filename: "bin_358_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_359_phi_M.png",
+                bin: 359,
+                label: "Bin 359",
+                filename: "bin_359_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_360_phi_M.png",
+                bin: 360,
+                label: "Bin 360",
+                filename: "bin_360_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_361_phi_M.png",
+                bin: 361,
+                label: "Bin 361",
+                filename: "bin_361_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_362_phi_M.png",
+                bin: 362,
+                label: "Bin 362",
+                filename: "bin_362_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_363_phi_M.png",
+                bin: 363,
+                label: "Bin 363",
+                filename: "bin_363_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_364_phi_M.png",
+                bin: 364,
+                label: "Bin 364",
+                filename: "bin_364_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_365_phi_M.png",
+                bin: 365,
+                label: "Bin 365",
+                filename: "bin_365_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_366_phi_M.png",
+                bin: 366,
+                label: "Bin 366",
+                filename: "bin_366_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_367_phi_M.png",
+                bin: 367,
+                label: "Bin 367",
+                filename: "bin_367_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_368_phi_M.png",
+                bin: 368,
+                label: "Bin 368",
+                filename: "bin_368_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_369_phi_M.png",
+                bin: 369,
+                label: "Bin 369",
+                filename: "bin_369_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_370_phi_M.png",
+                bin: 370,
+                label: "Bin 370",
+                filename: "bin_370_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_371_phi_M.png",
+                bin: 371,
+                label: "Bin 371",
+                filename: "bin_371_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_372_phi_M.png",
+                bin: 372,
+                label: "Bin 372",
+                filename: "bin_372_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_373_phi_M.png",
+                bin: 373,
+                label: "Bin 373",
+                filename: "bin_373_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_374_phi_M.png",
+                bin: 374,
+                label: "Bin 374",
+                filename: "bin_374_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_375_phi_M.png",
+                bin: 375,
+                label: "Bin 375",
+                filename: "bin_375_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_376_phi_M.png",
+                bin: 376,
+                label: "Bin 376",
+                filename: "bin_376_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_377_phi_M.png",
+                bin: 377,
+                label: "Bin 377",
+                filename: "bin_377_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_378_phi_M.png",
+                bin: 378,
+                label: "Bin 378",
+                filename: "bin_378_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_379_phi_M.png",
+                bin: 379,
+                label: "Bin 379",
+                filename: "bin_379_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_380_phi_M.png",
+                bin: 380,
+                label: "Bin 380",
+                filename: "bin_380_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_381_phi_M.png",
+                bin: 381,
+                label: "Bin 381",
+                filename: "bin_381_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_382_phi_M.png",
+                bin: 382,
+                label: "Bin 382",
+                filename: "bin_382_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_383_phi_M.png",
+                bin: 383,
+                label: "Bin 383",
+                filename: "bin_383_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_384_phi_M.png",
+                bin: 384,
+                label: "Bin 384",
+                filename: "bin_384_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_385_phi_M.png",
+                bin: 385,
+                label: "Bin 385",
+                filename: "bin_385_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_386_phi_M.png",
+                bin: 386,
+                label: "Bin 386",
+                filename: "bin_386_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_387_phi_M.png",
+                bin: 387,
+                label: "Bin 387",
+                filename: "bin_387_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_388_phi_M.png",
+                bin: 388,
+                label: "Bin 388",
+                filename: "bin_388_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_389_phi_M.png",
+                bin: 389,
+                label: "Bin 389",
+                filename: "bin_389_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_390_phi_M.png",
+                bin: 390,
+                label: "Bin 390",
+                filename: "bin_390_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_391_phi_M.png",
+                bin: 391,
+                label: "Bin 391",
+                filename: "bin_391_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_392_phi_M.png",
+                bin: 392,
+                label: "Bin 392",
+                filename: "bin_392_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_393_phi_M.png",
+                bin: 393,
+                label: "Bin 393",
+                filename: "bin_393_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_394_phi_M.png",
+                bin: 394,
+                label: "Bin 394",
+                filename: "bin_394_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_395_phi_M.png",
+                bin: 395,
+                label: "Bin 395",
+                filename: "bin_395_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_396_phi_M.png",
+                bin: 396,
+                label: "Bin 396",
+                filename: "bin_396_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_397_phi_M.png",
+                bin: 397,
+                label: "Bin 397",
+                filename: "bin_397_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_398_phi_M.png",
+                bin: 398,
+                label: "Bin 398",
+                filename: "bin_398_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_399_phi_M.png",
+                bin: 399,
+                label: "Bin 399",
+                filename: "bin_399_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_400_phi_M.png",
+                bin: 400,
+                label: "Bin 400",
+                filename: "bin_400_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_401_phi_M.png",
+                bin: 401,
+                label: "Bin 401",
+                filename: "bin_401_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_402_phi_M.png",
+                bin: 402,
+                label: "Bin 402",
+                filename: "bin_402_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_403_phi_M.png",
+                bin: 403,
+                label: "Bin 403",
+                filename: "bin_403_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_404_phi_M.png",
+                bin: 404,
+                label: "Bin 404",
+                filename: "bin_404_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_405_phi_M.png",
+                bin: 405,
+                label: "Bin 405",
+                filename: "bin_405_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_406_phi_M.png",
+                bin: 406,
+                label: "Bin 406",
+                filename: "bin_406_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_407_phi_M.png",
+                bin: 407,
+                label: "Bin 407",
+                filename: "bin_407_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_408_phi_M.png",
+                bin: 408,
+                label: "Bin 408",
+                filename: "bin_408_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_409_phi_M.png",
+                bin: 409,
+                label: "Bin 409",
+                filename: "bin_409_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_410_phi_M.png",
+                bin: 410,
+                label: "Bin 410",
+                filename: "bin_410_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_411_phi_M.png",
+                bin: 411,
+                label: "Bin 411",
+                filename: "bin_411_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_412_phi_M.png",
+                bin: 412,
+                label: "Bin 412",
+                filename: "bin_412_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_413_phi_M.png",
+                bin: 413,
+                label: "Bin 413",
+                filename: "bin_413_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_414_phi_M.png",
+                bin: 414,
+                label: "Bin 414",
+                filename: "bin_414_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_415_phi_M.png",
+                bin: 415,
+                label: "Bin 415",
+                filename: "bin_415_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_416_phi_M.png",
+                bin: 416,
+                label: "Bin 416",
+                filename: "bin_416_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_417_phi_M.png",
+                bin: 417,
+                label: "Bin 417",
+                filename: "bin_417_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_418_phi_M.png",
+                bin: 418,
+                label: "Bin 418",
+                filename: "bin_418_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_419_phi_M.png",
+                bin: 419,
+                label: "Bin 419",
+                filename: "bin_419_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_420_phi_M.png",
+                bin: 420,
+                label: "Bin 420",
+                filename: "bin_420_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_421_phi_M.png",
+                bin: 421,
+                label: "Bin 421",
+                filename: "bin_421_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_422_phi_M.png",
+                bin: 422,
+                label: "Bin 422",
+                filename: "bin_422_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_423_phi_M.png",
+                bin: 423,
+                label: "Bin 423",
+                filename: "bin_423_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_424_phi_M.png",
+                bin: 424,
+                label: "Bin 424",
+                filename: "bin_424_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_425_phi_M.png",
+                bin: 425,
+                label: "Bin 425",
+                filename: "bin_425_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_426_phi_M.png",
+                bin: 426,
+                label: "Bin 426",
+                filename: "bin_426_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_427_phi_M.png",
+                bin: 427,
+                label: "Bin 427",
+                filename: "bin_427_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_428_phi_M.png",
+                bin: 428,
+                label: "Bin 428",
+                filename: "bin_428_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_429_phi_M.png",
+                bin: 429,
+                label: "Bin 429",
+                filename: "bin_429_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_430_phi_M.png",
+                bin: 430,
+                label: "Bin 430",
+                filename: "bin_430_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_431_phi_M.png",
+                bin: 431,
+                label: "Bin 431",
+                filename: "bin_431_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_432_phi_M.png",
+                bin: 432,
+                label: "Bin 432",
+                filename: "bin_432_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_433_phi_M.png",
+                bin: 433,
+                label: "Bin 433",
+                filename: "bin_433_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_434_phi_M.png",
+                bin: 434,
+                label: "Bin 434",
+                filename: "bin_434_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_435_phi_M.png",
+                bin: 435,
+                label: "Bin 435",
+                filename: "bin_435_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_436_phi_M.png",
+                bin: 436,
+                label: "Bin 436",
+                filename: "bin_436_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_437_phi_M.png",
+                bin: 437,
+                label: "Bin 437",
+                filename: "bin_437_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_438_phi_M.png",
+                bin: 438,
+                label: "Bin 438",
+                filename: "bin_438_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_439_phi_M.png",
+                bin: 439,
+                label: "Bin 439",
+                filename: "bin_439_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_440_phi_M.png",
+                bin: 440,
+                label: "Bin 440",
+                filename: "bin_440_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_441_phi_M.png",
+                bin: 441,
+                label: "Bin 441",
+                filename: "bin_441_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_442_phi_M.png",
+                bin: 442,
+                label: "Bin 442",
+                filename: "bin_442_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_443_phi_M.png",
+                bin: 443,
+                label: "Bin 443",
+                filename: "bin_443_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_444_phi_M.png",
+                bin: 444,
+                label: "Bin 444",
+                filename: "bin_444_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_445_phi_M.png",
+                bin: 445,
+                label: "Bin 445",
+                filename: "bin_445_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_446_phi_M.png",
+                bin: 446,
+                label: "Bin 446",
+                filename: "bin_446_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_447_phi_M.png",
+                bin: 447,
+                label: "Bin 447",
+                filename: "bin_447_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_448_phi_M.png",
+                bin: 448,
+                label: "Bin 448",
+                filename: "bin_448_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_449_phi_M.png",
+                bin: 449,
+                label: "Bin 449",
+                filename: "bin_449_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_450_phi_M.png",
+                bin: 450,
+                label: "Bin 450",
+                filename: "bin_450_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_451_phi_M.png",
+                bin: 451,
+                label: "Bin 451",
+                filename: "bin_451_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_452_phi_M.png",
+                bin: 452,
+                label: "Bin 452",
+                filename: "bin_452_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_453_phi_M.png",
+                bin: 453,
+                label: "Bin 453",
+                filename: "bin_453_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_454_phi_M.png",
+                bin: 454,
+                label: "Bin 454",
+                filename: "bin_454_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_455_phi_M.png",
+                bin: 455,
+                label: "Bin 455",
+                filename: "bin_455_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_456_phi_M.png",
+                bin: 456,
+                label: "Bin 456",
+                filename: "bin_456_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_457_phi_M.png",
+                bin: 457,
+                label: "Bin 457",
+                filename: "bin_457_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_458_phi_M.png",
+                bin: 458,
+                label: "Bin 458",
+                filename: "bin_458_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_459_phi_M.png",
+                bin: 459,
+                label: "Bin 459",
+                filename: "bin_459_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_460_phi_M.png",
+                bin: 460,
+                label: "Bin 460",
+                filename: "bin_460_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_461_phi_M.png",
+                bin: 461,
+                label: "Bin 461",
+                filename: "bin_461_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_462_phi_M.png",
+                bin: 462,
+                label: "Bin 462",
+                filename: "bin_462_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_463_phi_M.png",
+                bin: 463,
+                label: "Bin 463",
+                filename: "bin_463_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_464_phi_M.png",
+                bin: 464,
+                label: "Bin 464",
+                filename: "bin_464_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_465_phi_M.png",
+                bin: 465,
+                label: "Bin 465",
+                filename: "bin_465_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_466_phi_M.png",
+                bin: 466,
+                label: "Bin 466",
+                filename: "bin_466_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_467_phi_M.png",
+                bin: 467,
+                label: "Bin 467",
+                filename: "bin_467_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_468_phi_M.png",
+                bin: 468,
+                label: "Bin 468",
+                filename: "bin_468_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_469_phi_M.png",
+                bin: 469,
+                label: "Bin 469",
+                filename: "bin_469_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_470_phi_M.png",
+                bin: 470,
+                label: "Bin 470",
+                filename: "bin_470_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_471_phi_M.png",
+                bin: 471,
+                label: "Bin 471",
+                filename: "bin_471_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_472_phi_M.png",
+                bin: 472,
+                label: "Bin 472",
+                filename: "bin_472_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_473_phi_M.png",
+                bin: 473,
+                label: "Bin 473",
+                filename: "bin_473_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_474_phi_M.png",
+                bin: 474,
+                label: "Bin 474",
+                filename: "bin_474_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_475_phi_M.png",
+                bin: 475,
+                label: "Bin 475",
+                filename: "bin_475_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_476_phi_M.png",
+                bin: 476,
+                label: "Bin 476",
+                filename: "bin_476_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_477_phi_M.png",
+                bin: 477,
+                label: "Bin 477",
+                filename: "bin_477_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_478_phi_M.png",
+                bin: 478,
+                label: "Bin 478",
+                filename: "bin_478_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_479_phi_M.png",
+                bin: 479,
+                label: "Bin 479",
+                filename: "bin_479_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_480_phi_M.png",
+                bin: 480,
+                label: "Bin 480",
+                filename: "bin_480_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_481_phi_M.png",
+                bin: 481,
+                label: "Bin 481",
+                filename: "bin_481_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_482_phi_M.png",
+                bin: 482,
+                label: "Bin 482",
+                filename: "bin_482_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_483_phi_M.png",
+                bin: 483,
+                label: "Bin 483",
+                filename: "bin_483_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_484_phi_M.png",
+                bin: 484,
+                label: "Bin 484",
+                filename: "bin_484_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_485_phi_M.png",
+                bin: 485,
+                label: "Bin 485",
+                filename: "bin_485_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_486_phi_M.png",
+                bin: 486,
+                label: "Bin 486",
+                filename: "bin_486_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_487_phi_M.png",
+                bin: 487,
+                label: "Bin 487",
+                filename: "bin_487_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_488_phi_M.png",
+                bin: 488,
+                label: "Bin 488",
+                filename: "bin_488_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_489_phi_M.png",
+                bin: 489,
+                label: "Bin 489",
+                filename: "bin_489_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_490_phi_M.png",
+                bin: 490,
+                label: "Bin 490",
+                filename: "bin_490_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_491_phi_M.png",
+                bin: 491,
+                label: "Bin 491",
+                filename: "bin_491_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_492_phi_M.png",
+                bin: 492,
+                label: "Bin 492",
+                filename: "bin_492_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_493_phi_M.png",
+                bin: 493,
+                label: "Bin 493",
+                filename: "bin_493_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_494_phi_M.png",
+                bin: 494,
+                label: "Bin 494",
+                filename: "bin_494_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_495_phi_M.png",
+                bin: 495,
+                label: "Bin 495",
+                filename: "bin_495_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_496_phi_M.png",
+                bin: 496,
+                label: "Bin 496",
+                filename: "bin_496_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_497_phi_M.png",
+                bin: 497,
+                label: "Bin 497",
+                filename: "bin_497_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_498_phi_M.png",
+                bin: 498,
+                label: "Bin 498",
+                filename: "bin_498_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_499_phi_M.png",
+                bin: 499,
+                label: "Bin 499",
+                filename: "bin_499_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_500_phi_M.png",
+                bin: 500,
+                label: "Bin 500",
+                filename: "bin_500_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_501_phi_M.png",
+                bin: 501,
+                label: "Bin 501",
+                filename: "bin_501_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_502_phi_M.png",
+                bin: 502,
+                label: "Bin 502",
+                filename: "bin_502_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_503_phi_M.png",
+                bin: 503,
+                label: "Bin 503",
+                filename: "bin_503_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_504_phi_M.png",
+                bin: 504,
+                label: "Bin 504",
+                filename: "bin_504_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_505_phi_M.png",
+                bin: 505,
+                label: "Bin 505",
+                filename: "bin_505_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_506_phi_M.png",
+                bin: 506,
+                label: "Bin 506",
+                filename: "bin_506_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_507_phi_M.png",
+                bin: 507,
+                label: "Bin 507",
+                filename: "bin_507_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_508_phi_M.png",
+                bin: 508,
+                label: "Bin 508",
+                filename: "bin_508_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_509_phi_M.png",
+                bin: 509,
+                label: "Bin 509",
+                filename: "bin_509_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_510_phi_M.png",
+                bin: 510,
+                label: "Bin 510",
+                filename: "bin_510_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_511_phi_M.png",
+                bin: 511,
+                label: "Bin 511",
+                filename: "bin_511_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_512_phi_M.png",
+                bin: 512,
+                label: "Bin 512",
+                filename: "bin_512_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_513_phi_M.png",
+                bin: 513,
+                label: "Bin 513",
+                filename: "bin_513_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_514_phi_M.png",
+                bin: 514,
+                label: "Bin 514",
+                filename: "bin_514_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_515_phi_M.png",
+                bin: 515,
+                label: "Bin 515",
+                filename: "bin_515_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_516_phi_M.png",
+                bin: 516,
+                label: "Bin 516",
+                filename: "bin_516_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_517_phi_M.png",
+                bin: 517,
+                label: "Bin 517",
+                filename: "bin_517_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_518_phi_M.png",
+                bin: 518,
+                label: "Bin 518",
+                filename: "bin_518_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_519_phi_M.png",
+                bin: 519,
+                label: "Bin 519",
+                filename: "bin_519_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_520_phi_M.png",
+                bin: 520,
+                label: "Bin 520",
+                filename: "bin_520_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_521_phi_M.png",
+                bin: 521,
+                label: "Bin 521",
+                filename: "bin_521_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_522_phi_M.png",
+                bin: 522,
+                label: "Bin 522",
+                filename: "bin_522_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_523_phi_M.png",
+                bin: 523,
+                label: "Bin 523",
+                filename: "bin_523_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_524_phi_M.png",
+                bin: 524,
+                label: "Bin 524",
+                filename: "bin_524_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_525_phi_M.png",
+                bin: 525,
+                label: "Bin 525",
+                filename: "bin_525_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_526_phi_M.png",
+                bin: 526,
+                label: "Bin 526",
+                filename: "bin_526_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_527_phi_M.png",
+                bin: 527,
+                label: "Bin 527",
+                filename: "bin_527_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_528_phi_M.png",
+                bin: 528,
+                label: "Bin 528",
+                filename: "bin_528_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_529_phi_M.png",
+                bin: 529,
+                label: "Bin 529",
+                filename: "bin_529_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_530_phi_M.png",
+                bin: 530,
+                label: "Bin 530",
+                filename: "bin_530_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_531_phi_M.png",
+                bin: 531,
+                label: "Bin 531",
+                filename: "bin_531_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_532_phi_M.png",
+                bin: 532,
+                label: "Bin 532",
+                filename: "bin_532_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_533_phi_M.png",
+                bin: 533,
+                label: "Bin 533",
+                filename: "bin_533_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_534_phi_M.png",
+                bin: 534,
+                label: "Bin 534",
+                filename: "bin_534_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_535_phi_M.png",
+                bin: 535,
+                label: "Bin 535",
+                filename: "bin_535_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_536_phi_M.png",
+                bin: 536,
+                label: "Bin 536",
+                filename: "bin_536_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_537_phi_M.png",
+                bin: 537,
+                label: "Bin 537",
+                filename: "bin_537_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_538_phi_M.png",
+                bin: 538,
+                label: "Bin 538",
+                filename: "bin_538_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_539_phi_M.png",
+                bin: 539,
+                label: "Bin 539",
+                filename: "bin_539_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_540_phi_M.png",
+                bin: 540,
+                label: "Bin 540",
+                filename: "bin_540_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_541_phi_M.png",
+                bin: 541,
+                label: "Bin 541",
+                filename: "bin_541_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_542_phi_M.png",
+                bin: 542,
+                label: "Bin 542",
+                filename: "bin_542_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_543_phi_M.png",
+                bin: 543,
+                label: "Bin 543",
+                filename: "bin_543_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_544_phi_M.png",
+                bin: 544,
+                label: "Bin 544",
+                filename: "bin_544_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_545_phi_M.png",
+                bin: 545,
+                label: "Bin 545",
+                filename: "bin_545_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_546_phi_M.png",
+                bin: 546,
+                label: "Bin 546",
+                filename: "bin_546_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_547_phi_M.png",
+                bin: 547,
+                label: "Bin 547",
+                filename: "bin_547_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_548_phi_M.png",
+                bin: 548,
+                label: "Bin 548",
+                filename: "bin_548_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_549_phi_M.png",
+                bin: 549,
+                label: "Bin 549",
+                filename: "bin_549_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_550_phi_M.png",
+                bin: 550,
+                label: "Bin 550",
+                filename: "bin_550_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_551_phi_M.png",
+                bin: 551,
+                label: "Bin 551",
+                filename: "bin_551_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_552_phi_M.png",
+                bin: 552,
+                label: "Bin 552",
+                filename: "bin_552_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_553_phi_M.png",
+                bin: 553,
+                label: "Bin 553",
+                filename: "bin_553_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_554_phi_M.png",
+                bin: 554,
+                label: "Bin 554",
+                filename: "bin_554_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_555_phi_M.png",
+                bin: 555,
+                label: "Bin 555",
+                filename: "bin_555_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_556_phi_M.png",
+                bin: 556,
+                label: "Bin 556",
+                filename: "bin_556_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_557_phi_M.png",
+                bin: 557,
+                label: "Bin 557",
+                filename: "bin_557_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_558_phi_M.png",
+                bin: 558,
+                label: "Bin 558",
+                filename: "bin_558_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_559_phi_M.png",
+                bin: 559,
+                label: "Bin 559",
+                filename: "bin_559_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_560_phi_M.png",
+                bin: 560,
+                label: "Bin 560",
+                filename: "bin_560_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_561_phi_M.png",
+                bin: 561,
+                label: "Bin 561",
+                filename: "bin_561_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_562_phi_M.png",
+                bin: 562,
+                label: "Bin 562",
+                filename: "bin_562_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_563_phi_M.png",
+                bin: 563,
+                label: "Bin 563",
+                filename: "bin_563_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_564_phi_M.png",
+                bin: 564,
+                label: "Bin 564",
+                filename: "bin_564_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_565_phi_M.png",
+                bin: 565,
+                label: "Bin 565",
+                filename: "bin_565_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_566_phi_M.png",
+                bin: 566,
+                label: "Bin 566",
+                filename: "bin_566_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_567_phi_M.png",
+                bin: 567,
+                label: "Bin 567",
+                filename: "bin_567_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_568_phi_M.png",
+                bin: 568,
+                label: "Bin 568",
+                filename: "bin_568_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_569_phi_M.png",
+                bin: 569,
+                label: "Bin 569",
+                filename: "bin_569_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_570_phi_M.png",
+                bin: 570,
+                label: "Bin 570",
+                filename: "bin_570_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_571_phi_M.png",
+                bin: 571,
+                label: "Bin 571",
+                filename: "bin_571_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_572_phi_M.png",
+                bin: 572,
+                label: "Bin 572",
+                filename: "bin_572_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_573_phi_M.png",
+                bin: 573,
+                label: "Bin 573",
+                filename: "bin_573_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_574_phi_M.png",
+                bin: 574,
+                label: "Bin 574",
+                filename: "bin_574_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_575_phi_M.png",
+                bin: 575,
+                label: "Bin 575",
+                filename: "bin_575_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_576_phi_M.png",
+                bin: 576,
+                label: "Bin 576",
+                filename: "bin_576_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_577_phi_M.png",
+                bin: 577,
+                label: "Bin 577",
+                filename: "bin_577_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_578_phi_M.png",
+                bin: 578,
+                label: "Bin 578",
+                filename: "bin_578_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_579_phi_M.png",
+                bin: 579,
+                label: "Bin 579",
+                filename: "bin_579_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_580_phi_M.png",
+                bin: 580,
+                label: "Bin 580",
+                filename: "bin_580_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_581_phi_M.png",
+                bin: 581,
+                label: "Bin 581",
+                filename: "bin_581_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_582_phi_M.png",
+                bin: 582,
+                label: "Bin 582",
+                filename: "bin_582_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_583_phi_M.png",
+                bin: 583,
+                label: "Bin 583",
+                filename: "bin_583_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_584_phi_M.png",
+                bin: 584,
+                label: "Bin 584",
+                filename: "bin_584_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_585_phi_M.png",
+                bin: 585,
+                label: "Bin 585",
+                filename: "bin_585_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_586_phi_M.png",
+                bin: 586,
+                label: "Bin 586",
+                filename: "bin_586_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_587_phi_M.png",
+                bin: 587,
+                label: "Bin 587",
+                filename: "bin_587_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_588_phi_M.png",
+                bin: 588,
+                label: "Bin 588",
+                filename: "bin_588_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_589_phi_M.png",
+                bin: 589,
+                label: "Bin 589",
+                filename: "bin_589_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_590_phi_M.png",
+                bin: 590,
+                label: "Bin 590",
+                filename: "bin_590_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_591_phi_M.png",
+                bin: 591,
+                label: "Bin 591",
+                filename: "bin_591_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_592_phi_M.png",
+                bin: 592,
+                label: "Bin 592",
+                filename: "bin_592_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_593_phi_M.png",
+                bin: 593,
+                label: "Bin 593",
+                filename: "bin_593_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_594_phi_M.png",
+                bin: 594,
+                label: "Bin 594",
+                filename: "bin_594_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_595_phi_M.png",
+                bin: 595,
+                label: "Bin 595",
+                filename: "bin_595_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_596_phi_M.png",
+                bin: 596,
+                label: "Bin 596",
+                filename: "bin_596_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_597_phi_M.png",
+                bin: 597,
+                label: "Bin 597",
+                filename: "bin_597_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_598_phi_M.png",
+                bin: 598,
+                label: "Bin 598",
+                filename: "bin_598_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_599_phi_M.png",
+                bin: 599,
+                label: "Bin 599",
+                filename: "bin_599_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_600_phi_M.png",
+                bin: 600,
+                label: "Bin 600",
+                filename: "bin_600_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_601_phi_M.png",
+                bin: 601,
+                label: "Bin 601",
+                filename: "bin_601_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_602_phi_M.png",
+                bin: 602,
+                label: "Bin 602",
+                filename: "bin_602_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_603_phi_M.png",
+                bin: 603,
+                label: "Bin 603",
+                filename: "bin_603_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_604_phi_M.png",
+                bin: 604,
+                label: "Bin 604",
+                filename: "bin_604_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_605_phi_M.png",
+                bin: 605,
+                label: "Bin 605",
+                filename: "bin_605_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_606_phi_M.png",
+                bin: 606,
+                label: "Bin 606",
+                filename: "bin_606_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_607_phi_M.png",
+                bin: 607,
+                label: "Bin 607",
+                filename: "bin_607_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_608_phi_M.png",
+                bin: 608,
+                label: "Bin 608",
+                filename: "bin_608_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_609_phi_M.png",
+                bin: 609,
+                label: "Bin 609",
+                filename: "bin_609_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_610_phi_M.png",
+                bin: 610,
+                label: "Bin 610",
+                filename: "bin_610_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_611_phi_M.png",
+                bin: 611,
+                label: "Bin 611",
+                filename: "bin_611_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_612_phi_M.png",
+                bin: 612,
+                label: "Bin 612",
+                filename: "bin_612_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_613_phi_M.png",
+                bin: 613,
+                label: "Bin 613",
+                filename: "bin_613_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_614_phi_M.png",
+                bin: 614,
+                label: "Bin 614",
+                filename: "bin_614_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_615_phi_M.png",
+                bin: 615,
+                label: "Bin 615",
+                filename: "bin_615_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_616_phi_M.png",
+                bin: 616,
+                label: "Bin 616",
+                filename: "bin_616_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_617_phi_M.png",
+                bin: 617,
+                label: "Bin 617",
+                filename: "bin_617_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_618_phi_M.png",
+                bin: 618,
+                label: "Bin 618",
+                filename: "bin_618_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_619_phi_M.png",
+                bin: 619,
+                label: "Bin 619",
+                filename: "bin_619_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_620_phi_M.png",
+                bin: 620,
+                label: "Bin 620",
+                filename: "bin_620_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_621_phi_M.png",
+                bin: 621,
+                label: "Bin 621",
+                filename: "bin_621_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_622_phi_M.png",
+                bin: 622,
+                label: "Bin 622",
+                filename: "bin_622_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_623_phi_M.png",
+                bin: 623,
+                label: "Bin 623",
+                filename: "bin_623_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_624_phi_M.png",
+                bin: 624,
+                label: "Bin 624",
+                filename: "bin_624_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_625_phi_M.png",
+                bin: 625,
+                label: "Bin 625",
+                filename: "bin_625_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_626_phi_M.png",
+                bin: 626,
+                label: "Bin 626",
+                filename: "bin_626_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_627_phi_M.png",
+                bin: 627,
+                label: "Bin 627",
+                filename: "bin_627_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_628_phi_M.png",
+                bin: 628,
+                label: "Bin 628",
+                filename: "bin_628_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_629_phi_M.png",
+                bin: 629,
+                label: "Bin 629",
+                filename: "bin_629_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_630_phi_M.png",
+                bin: 630,
+                label: "Bin 630",
+                filename: "bin_630_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_631_phi_M.png",
+                bin: 631,
+                label: "Bin 631",
+                filename: "bin_631_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_632_phi_M.png",
+                bin: 632,
+                label: "Bin 632",
+                filename: "bin_632_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_633_phi_M.png",
+                bin: 633,
+                label: "Bin 633",
+                filename: "bin_633_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_634_phi_M.png",
+                bin: 634,
+                label: "Bin 634",
+                filename: "bin_634_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_635_phi_M.png",
+                bin: 635,
+                label: "Bin 635",
+                filename: "bin_635_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_636_phi_M.png",
+                bin: 636,
+                label: "Bin 636",
+                filename: "bin_636_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_637_phi_M.png",
+                bin: 637,
+                label: "Bin 637",
+                filename: "bin_637_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_638_phi_M.png",
+                bin: 638,
+                label: "Bin 638",
+                filename: "bin_638_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_639_phi_M.png",
+                bin: 639,
+                label: "Bin 639",
+                filename: "bin_639_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_640_phi_M.png",
+                bin: 640,
+                label: "Bin 640",
+                filename: "bin_640_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_641_phi_M.png",
+                bin: 641,
+                label: "Bin 641",
+                filename: "bin_641_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_642_phi_M.png",
+                bin: 642,
+                label: "Bin 642",
+                filename: "bin_642_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_643_phi_M.png",
+                bin: 643,
+                label: "Bin 643",
+                filename: "bin_643_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_644_phi_M.png",
+                bin: 644,
+                label: "Bin 644",
+                filename: "bin_644_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_645_phi_M.png",
+                bin: 645,
+                label: "Bin 645",
+                filename: "bin_645_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_646_phi_M.png",
+                bin: 646,
+                label: "Bin 646",
+                filename: "bin_646_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_647_phi_M.png",
+                bin: 647,
+                label: "Bin 647",
+                filename: "bin_647_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_648_phi_M.png",
+                bin: 648,
+                label: "Bin 648",
+                filename: "bin_648_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_649_phi_M.png",
+                bin: 649,
+                label: "Bin 649",
+                filename: "bin_649_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_650_phi_M.png",
+                bin: 650,
+                label: "Bin 650",
+                filename: "bin_650_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_651_phi_M.png",
+                bin: 651,
+                label: "Bin 651",
+                filename: "bin_651_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_652_phi_M.png",
+                bin: 652,
+                label: "Bin 652",
+                filename: "bin_652_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_653_phi_M.png",
+                bin: 653,
+                label: "Bin 653",
+                filename: "bin_653_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_654_phi_M.png",
+                bin: 654,
+                label: "Bin 654",
+                filename: "bin_654_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_655_phi_M.png",
+                bin: 655,
+                label: "Bin 655",
+                filename: "bin_655_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_656_phi_M.png",
+                bin: 656,
+                label: "Bin 656",
+                filename: "bin_656_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_657_phi_M.png",
+                bin: 657,
+                label: "Bin 657",
+                filename: "bin_657_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_658_phi_M.png",
+                bin: 658,
+                label: "Bin 658",
+                filename: "bin_658_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_659_phi_M.png",
+                bin: 659,
+                label: "Bin 659",
+                filename: "bin_659_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_660_phi_M.png",
+                bin: 660,
+                label: "Bin 660",
+                filename: "bin_660_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_661_phi_M.png",
+                bin: 661,
+                label: "Bin 661",
+                filename: "bin_661_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_662_phi_M.png",
+                bin: 662,
+                label: "Bin 662",
+                filename: "bin_662_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_663_phi_M.png",
+                bin: 663,
+                label: "Bin 663",
+                filename: "bin_663_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_664_phi_M.png",
+                bin: 664,
+                label: "Bin 664",
+                filename: "bin_664_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_665_phi_M.png",
+                bin: 665,
+                label: "Bin 665",
+                filename: "bin_665_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_666_phi_M.png",
+                bin: 666,
+                label: "Bin 666",
+                filename: "bin_666_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_667_phi_M.png",
+                bin: 667,
+                label: "Bin 667",
+                filename: "bin_667_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_668_phi_M.png",
+                bin: 668,
+                label: "Bin 668",
+                filename: "bin_668_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_669_phi_M.png",
+                bin: 669,
+                label: "Bin 669",
+                filename: "bin_669_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_670_phi_M.png",
+                bin: 670,
+                label: "Bin 670",
+                filename: "bin_670_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_671_phi_M.png",
+                bin: 671,
+                label: "Bin 671",
+                filename: "bin_671_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_672_phi_M.png",
+                bin: 672,
+                label: "Bin 672",
+                filename: "bin_672_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_673_phi_M.png",
+                bin: 673,
+                label: "Bin 673",
+                filename: "bin_673_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_674_phi_M.png",
+                bin: 674,
+                label: "Bin 674",
+                filename: "bin_674_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_675_phi_M.png",
+                bin: 675,
+                label: "Bin 675",
+                filename: "bin_675_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_676_phi_M.png",
+                bin: 676,
+                label: "Bin 676",
+                filename: "bin_676_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_677_phi_M.png",
+                bin: 677,
+                label: "Bin 677",
+                filename: "bin_677_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_678_phi_M.png",
+                bin: 678,
+                label: "Bin 678",
+                filename: "bin_678_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_679_phi_M.png",
+                bin: 679,
+                label: "Bin 679",
+                filename: "bin_679_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_680_phi_M.png",
+                bin: 680,
+                label: "Bin 680",
+                filename: "bin_680_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_681_phi_M.png",
+                bin: 681,
+                label: "Bin 681",
+                filename: "bin_681_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_682_phi_M.png",
+                bin: 682,
+                label: "Bin 682",
+                filename: "bin_682_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_683_phi_M.png",
+                bin: 683,
+                label: "Bin 683",
+                filename: "bin_683_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_684_phi_M.png",
+                bin: 684,
+                label: "Bin 684",
+                filename: "bin_684_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_685_phi_M.png",
+                bin: 685,
+                label: "Bin 685",
+                filename: "bin_685_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_686_phi_M.png",
+                bin: 686,
+                label: "Bin 686",
+                filename: "bin_686_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_687_phi_M.png",
+                bin: 687,
+                label: "Bin 687",
+                filename: "bin_687_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_688_phi_M.png",
+                bin: 688,
+                label: "Bin 688",
+                filename: "bin_688_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_689_phi_M.png",
+                bin: 689,
+                label: "Bin 689",
+                filename: "bin_689_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_690_phi_M.png",
+                bin: 690,
+                label: "Bin 690",
+                filename: "bin_690_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_691_phi_M.png",
+                bin: 691,
+                label: "Bin 691",
+                filename: "bin_691_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_692_phi_M.png",
+                bin: 692,
+                label: "Bin 692",
+                filename: "bin_692_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_693_phi_M.png",
+                bin: 693,
+                label: "Bin 693",
+                filename: "bin_693_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_694_phi_M.png",
+                bin: 694,
+                label: "Bin 694",
+                filename: "bin_694_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_695_phi_M.png",
+                bin: 695,
+                label: "Bin 695",
+                filename: "bin_695_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_696_phi_M.png",
+                bin: 696,
+                label: "Bin 696",
+                filename: "bin_696_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_697_phi_M.png",
+                bin: 697,
+                label: "Bin 697",
+                filename: "bin_697_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_698_phi_M.png",
+                bin: 698,
+                label: "Bin 698",
+                filename: "bin_698_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_699_phi_M.png",
+                bin: 699,
+                label: "Bin 699",
+                filename: "bin_699_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_700_phi_M.png",
+                bin: 700,
+                label: "Bin 700",
+                filename: "bin_700_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_701_phi_M.png",
+                bin: 701,
+                label: "Bin 701",
+                filename: "bin_701_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_702_phi_M.png",
+                bin: 702,
+                label: "Bin 702",
+                filename: "bin_702_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_703_phi_M.png",
+                bin: 703,
+                label: "Bin 703",
+                filename: "bin_703_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_704_phi_M.png",
+                bin: 704,
+                label: "Bin 704",
+                filename: "bin_704_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_705_phi_M.png",
+                bin: 705,
+                label: "Bin 705",
+                filename: "bin_705_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_706_phi_M.png",
+                bin: 706,
+                label: "Bin 706",
+                filename: "bin_706_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_707_phi_M.png",
+                bin: 707,
+                label: "Bin 707",
+                filename: "bin_707_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_708_phi_M.png",
+                bin: 708,
+                label: "Bin 708",
+                filename: "bin_708_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_709_phi_M.png",
+                bin: 709,
+                label: "Bin 709",
+                filename: "bin_709_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_710_phi_M.png",
+                bin: 710,
+                label: "Bin 710",
+                filename: "bin_710_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_711_phi_M.png",
+                bin: 711,
+                label: "Bin 711",
+                filename: "bin_711_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_712_phi_M.png",
+                bin: 712,
+                label: "Bin 712",
+                filename: "bin_712_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_713_phi_M.png",
+                bin: 713,
+                label: "Bin 713",
+                filename: "bin_713_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_714_phi_M.png",
+                bin: 714,
+                label: "Bin 714",
+                filename: "bin_714_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_715_phi_M.png",
+                bin: 715,
+                label: "Bin 715",
+                filename: "bin_715_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_716_phi_M.png",
+                bin: 716,
+                label: "Bin 716",
+                filename: "bin_716_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_717_phi_M.png",
+                bin: 717,
+                label: "Bin 717",
+                filename: "bin_717_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_718_phi_M.png",
+                bin: 718,
+                label: "Bin 718",
+                filename: "bin_718_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_719_phi_M.png",
+                bin: 719,
+                label: "Bin 719",
+                filename: "bin_719_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_720_phi_M.png",
+                bin: 720,
+                label: "Bin 720",
+                filename: "bin_720_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_721_phi_M.png",
+                bin: 721,
+                label: "Bin 721",
+                filename: "bin_721_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_722_phi_M.png",
+                bin: 722,
+                label: "Bin 722",
+                filename: "bin_722_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_723_phi_M.png",
+                bin: 723,
+                label: "Bin 723",
+                filename: "bin_723_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_724_phi_M.png",
+                bin: 724,
+                label: "Bin 724",
+                filename: "bin_724_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_725_phi_M.png",
+                bin: 725,
+                label: "Bin 725",
+                filename: "bin_725_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_726_phi_M.png",
+                bin: 726,
+                label: "Bin 726",
+                filename: "bin_726_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_727_phi_M.png",
+                bin: 727,
+                label: "Bin 727",
+                filename: "bin_727_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_728_phi_M.png",
+                bin: 728,
+                label: "Bin 728",
+                filename: "bin_728_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_729_phi_M.png",
+                bin: 729,
+                label: "Bin 729",
+                filename: "bin_729_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_730_phi_M.png",
+                bin: 730,
+                label: "Bin 730",
+                filename: "bin_730_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_731_phi_M.png",
+                bin: 731,
+                label: "Bin 731",
+                filename: "bin_731_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_732_phi_M.png",
+                bin: 732,
+                label: "Bin 732",
+                filename: "bin_732_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_733_phi_M.png",
+                bin: 733,
+                label: "Bin 733",
+                filename: "bin_733_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_734_phi_M.png",
+                bin: 734,
+                label: "Bin 734",
+                filename: "bin_734_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_735_phi_M.png",
+                bin: 735,
+                label: "Bin 735",
+                filename: "bin_735_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_736_phi_M.png",
+                bin: 736,
+                label: "Bin 736",
+                filename: "bin_736_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_737_phi_M.png",
+                bin: 737,
+                label: "Bin 737",
+                filename: "bin_737_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_738_phi_M.png",
+                bin: 738,
+                label: "Bin 738",
+                filename: "bin_738_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_739_phi_M.png",
+                bin: 739,
+                label: "Bin 739",
+                filename: "bin_739_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_740_phi_M.png",
+                bin: 740,
+                label: "Bin 740",
+                filename: "bin_740_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_741_phi_M.png",
+                bin: 741,
+                label: "Bin 741",
+                filename: "bin_741_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_742_phi_M.png",
+                bin: 742,
+                label: "Bin 742",
+                filename: "bin_742_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_743_phi_M.png",
+                bin: 743,
+                label: "Bin 743",
+                filename: "bin_743_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_744_phi_M.png",
+                bin: 744,
+                label: "Bin 744",
+                filename: "bin_744_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_745_phi_M.png",
+                bin: 745,
+                label: "Bin 745",
+                filename: "bin_745_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_746_phi_M.png",
+                bin: 746,
+                label: "Bin 746",
+                filename: "bin_746_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_747_phi_M.png",
+                bin: 747,
+                label: "Bin 747",
+                filename: "bin_747_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_748_phi_M.png",
+                bin: 748,
+                label: "Bin 748",
+                filename: "bin_748_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_749_phi_M.png",
+                bin: 749,
+                label: "Bin 749",
+                filename: "bin_749_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_750_phi_M.png",
+                bin: 750,
+                label: "Bin 750",
+                filename: "bin_750_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_751_phi_M.png",
+                bin: 751,
+                label: "Bin 751",
+                filename: "bin_751_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_752_phi_M.png",
+                bin: 752,
+                label: "Bin 752",
+                filename: "bin_752_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_753_phi_M.png",
+                bin: 753,
+                label: "Bin 753",
+                filename: "bin_753_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_754_phi_M.png",
+                bin: 754,
+                label: "Bin 754",
+                filename: "bin_754_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_755_phi_M.png",
+                bin: 755,
+                label: "Bin 755",
+                filename: "bin_755_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_756_phi_M.png",
+                bin: 756,
+                label: "Bin 756",
+                filename: "bin_756_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_757_phi_M.png",
+                bin: 757,
+                label: "Bin 757",
+                filename: "bin_757_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_758_phi_M.png",
+                bin: 758,
+                label: "Bin 758",
+                filename: "bin_758_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_759_phi_M.png",
+                bin: 759,
+                label: "Bin 759",
+                filename: "bin_759_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_760_phi_M.png",
+                bin: 760,
+                label: "Bin 760",
+                filename: "bin_760_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_761_phi_M.png",
+                bin: 761,
+                label: "Bin 761",
+                filename: "bin_761_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_762_phi_M.png",
+                bin: 762,
+                label: "Bin 762",
+                filename: "bin_762_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_763_phi_M.png",
+                bin: 763,
+                label: "Bin 763",
+                filename: "bin_763_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_764_phi_M.png",
+                bin: 764,
+                label: "Bin 764",
+                filename: "bin_764_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_765_phi_M.png",
+                bin: 765,
+                label: "Bin 765",
+                filename: "bin_765_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_766_phi_M.png",
+                bin: 766,
+                label: "Bin 766",
+                filename: "bin_766_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_767_phi_M.png",
+                bin: 767,
+                label: "Bin 767",
+                filename: "bin_767_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_768_phi_M.png",
+                bin: 768,
+                label: "Bin 768",
+                filename: "bin_768_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_769_phi_M.png",
+                bin: 769,
+                label: "Bin 769",
+                filename: "bin_769_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_770_phi_M.png",
+                bin: 770,
+                label: "Bin 770",
+                filename: "bin_770_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_771_phi_M.png",
+                bin: 771,
+                label: "Bin 771",
+                filename: "bin_771_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_772_phi_M.png",
+                bin: 772,
+                label: "Bin 772",
+                filename: "bin_772_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_773_phi_M.png",
+                bin: 773,
+                label: "Bin 773",
+                filename: "bin_773_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_774_phi_M.png",
+                bin: 774,
+                label: "Bin 774",
+                filename: "bin_774_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_775_phi_M.png",
+                bin: 775,
+                label: "Bin 775",
+                filename: "bin_775_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_776_phi_M.png",
+                bin: 776,
+                label: "Bin 776",
+                filename: "bin_776_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_777_phi_M.png",
+                bin: 777,
+                label: "Bin 777",
+                filename: "bin_777_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_778_phi_M.png",
+                bin: 778,
+                label: "Bin 778",
+                filename: "bin_778_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_779_phi_M.png",
+                bin: 779,
+                label: "Bin 779",
+                filename: "bin_779_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_780_phi_M.png",
+                bin: 780,
+                label: "Bin 780",
+                filename: "bin_780_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_781_phi_M.png",
+                bin: 781,
+                label: "Bin 781",
+                filename: "bin_781_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_782_phi_M.png",
+                bin: 782,
+                label: "Bin 782",
+                filename: "bin_782_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_783_phi_M.png",
+                bin: 783,
+                label: "Bin 783",
+                filename: "bin_783_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_784_phi_M.png",
+                bin: 784,
+                label: "Bin 784",
+                filename: "bin_784_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_785_phi_M.png",
+                bin: 785,
+                label: "Bin 785",
+                filename: "bin_785_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_786_phi_M.png",
+                bin: 786,
+                label: "Bin 786",
+                filename: "bin_786_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_787_phi_M.png",
+                bin: 787,
+                label: "Bin 787",
+                filename: "bin_787_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_788_phi_M.png",
+                bin: 788,
+                label: "Bin 788",
+                filename: "bin_788_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_789_phi_M.png",
+                bin: 789,
+                label: "Bin 789",
+                filename: "bin_789_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_791_phi_M.png",
+                bin: 791,
+                label: "Bin 791",
+                filename: "bin_791_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_792_phi_M.png",
+                bin: 792,
+                label: "Bin 792",
+                filename: "bin_792_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_794_phi_M.png",
+                bin: 794,
+                label: "Bin 794",
+                filename: "bin_794_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_797_phi_M.png",
+                bin: 797,
+                label: "Bin 797",
+                filename: "bin_797_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_799_phi_M.png",
+                bin: 799,
+                label: "Bin 799",
+                filename: "bin_799_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_800_phi_M.png",
+                bin: 800,
+                label: "Bin 800",
+                filename: "bin_800_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_801_phi_M.png",
+                bin: 801,
+                label: "Bin 801",
+                filename: "bin_801_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_802_phi_M.png",
+                bin: 802,
+                label: "Bin 802",
+                filename: "bin_802_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_803_phi_M.png",
+                bin: 803,
+                label: "Bin 803",
+                filename: "bin_803_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_804_phi_M.png",
+                bin: 804,
+                label: "Bin 804",
+                filename: "bin_804_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_805_phi_M.png",
+                bin: 805,
+                label: "Bin 805",
+                filename: "bin_805_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_806_phi_M.png",
+                bin: 806,
+                label: "Bin 806",
+                filename: "bin_806_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_807_phi_M.png",
+                bin: 807,
+                label: "Bin 807",
+                filename: "bin_807_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_808_phi_M.png",
+                bin: 808,
+                label: "Bin 808",
+                filename: "bin_808_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_809_phi_M.png",
+                bin: 809,
+                label: "Bin 809",
+                filename: "bin_809_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_810_phi_M.png",
+                bin: 810,
+                label: "Bin 810",
+                filename: "bin_810_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_811_phi_M.png",
+                bin: 811,
+                label: "Bin 811",
+                filename: "bin_811_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_812_phi_M.png",
+                bin: 812,
+                label: "Bin 812",
+                filename: "bin_812_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_813_phi_M.png",
+                bin: 813,
+                label: "Bin 813",
+                filename: "bin_813_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_814_phi_M.png",
+                bin: 814,
+                label: "Bin 814",
+                filename: "bin_814_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_815_phi_M.png",
+                bin: 815,
+                label: "Bin 815",
+                filename: "bin_815_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_816_phi_M.png",
+                bin: 816,
+                label: "Bin 816",
+                filename: "bin_816_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_817_phi_M.png",
+                bin: 817,
+                label: "Bin 817",
+                filename: "bin_817_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_818_phi_M.png",
+                bin: 818,
+                label: "Bin 818",
+                filename: "bin_818_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_819_phi_M.png",
+                bin: 819,
+                label: "Bin 819",
+                filename: "bin_819_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_820_phi_M.png",
+                bin: 820,
+                label: "Bin 820",
+                filename: "bin_820_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_821_phi_M.png",
+                bin: 821,
+                label: "Bin 821",
+                filename: "bin_821_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_822_phi_M.png",
+                bin: 822,
+                label: "Bin 822",
+                filename: "bin_822_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_823_phi_M.png",
+                bin: 823,
+                label: "Bin 823",
+                filename: "bin_823_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_824_phi_M.png",
+                bin: 824,
+                label: "Bin 824",
+                filename: "bin_824_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_825_phi_M.png",
+                bin: 825,
+                label: "Bin 825",
+                filename: "bin_825_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_826_phi_M.png",
+                bin: 826,
+                label: "Bin 826",
+                filename: "bin_826_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_827_phi_M.png",
+                bin: 827,
+                label: "Bin 827",
+                filename: "bin_827_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_828_phi_M.png",
+                bin: 828,
+                label: "Bin 828",
+                filename: "bin_828_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_829_phi_M.png",
+                bin: 829,
+                label: "Bin 829",
+                filename: "bin_829_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_830_phi_M.png",
+                bin: 830,
+                label: "Bin 830",
+                filename: "bin_830_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_831_phi_M.png",
+                bin: 831,
+                label: "Bin 831",
+                filename: "bin_831_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_832_phi_M.png",
+                bin: 832,
+                label: "Bin 832",
+                filename: "bin_832_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_833_phi_M.png",
+                bin: 833,
+                label: "Bin 833",
+                filename: "bin_833_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_834_phi_M.png",
+                bin: 834,
+                label: "Bin 834",
+                filename: "bin_834_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_835_phi_M.png",
+                bin: 835,
+                label: "Bin 835",
+                filename: "bin_835_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_836_phi_M.png",
+                bin: 836,
+                label: "Bin 836",
+                filename: "bin_836_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_837_phi_M.png",
+                bin: 837,
+                label: "Bin 837",
+                filename: "bin_837_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_838_phi_M.png",
+                bin: 838,
+                label: "Bin 838",
+                filename: "bin_838_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_839_phi_M.png",
+                bin: 839,
+                label: "Bin 839",
+                filename: "bin_839_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_840_phi_M.png",
+                bin: 840,
+                label: "Bin 840",
+                filename: "bin_840_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_841_phi_M.png",
+                bin: 841,
+                label: "Bin 841",
+                filename: "bin_841_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_842_phi_M.png",
+                bin: 842,
+                label: "Bin 842",
+                filename: "bin_842_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_843_phi_M.png",
+                bin: 843,
+                label: "Bin 843",
+                filename: "bin_843_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_844_phi_M.png",
+                bin: 844,
+                label: "Bin 844",
+                filename: "bin_844_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_845_phi_M.png",
+                bin: 845,
+                label: "Bin 845",
+                filename: "bin_845_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_846_phi_M.png",
+                bin: 846,
+                label: "Bin 846",
+                filename: "bin_846_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_847_phi_M.png",
+                bin: 847,
+                label: "Bin 847",
+                filename: "bin_847_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_848_phi_M.png",
+                bin: 848,
+                label: "Bin 848",
+                filename: "bin_848_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_849_phi_M.png",
+                bin: 849,
+                label: "Bin 849",
+                filename: "bin_849_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_850_phi_M.png",
+                bin: 850,
+                label: "Bin 850",
+                filename: "bin_850_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_851_phi_M.png",
+                bin: 851,
+                label: "Bin 851",
+                filename: "bin_851_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_852_phi_M.png",
+                bin: 852,
+                label: "Bin 852",
+                filename: "bin_852_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_853_phi_M.png",
+                bin: 853,
+                label: "Bin 853",
+                filename: "bin_853_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_854_phi_M.png",
+                bin: 854,
+                label: "Bin 854",
+                filename: "bin_854_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_855_phi_M.png",
+                bin: 855,
+                label: "Bin 855",
+                filename: "bin_855_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_856_phi_M.png",
+                bin: 856,
+                label: "Bin 856",
+                filename: "bin_856_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_857_phi_M.png",
+                bin: 857,
+                label: "Bin 857",
+                filename: "bin_857_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_858_phi_M.png",
+                bin: 858,
+                label: "Bin 858",
+                filename: "bin_858_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_859_phi_M.png",
+                bin: 859,
+                label: "Bin 859",
+                filename: "bin_859_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_860_phi_M.png",
+                bin: 860,
+                label: "Bin 860",
+                filename: "bin_860_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_861_phi_M.png",
+                bin: 861,
+                label: "Bin 861",
+                filename: "bin_861_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_862_phi_M.png",
+                bin: 862,
+                label: "Bin 862",
+                filename: "bin_862_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_863_phi_M.png",
+                bin: 863,
+                label: "Bin 863",
+                filename: "bin_863_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_864_phi_M.png",
+                bin: 864,
+                label: "Bin 864",
+                filename: "bin_864_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_865_phi_M.png",
+                bin: 865,
+                label: "Bin 865",
+                filename: "bin_865_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_866_phi_M.png",
+                bin: 866,
+                label: "Bin 866",
+                filename: "bin_866_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_867_phi_M.png",
+                bin: 867,
+                label: "Bin 867",
+                filename: "bin_867_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_868_phi_M.png",
+                bin: 868,
+                label: "Bin 868",
+                filename: "bin_868_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_869_phi_M.png",
+                bin: 869,
+                label: "Bin 869",
+                filename: "bin_869_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_870_phi_M.png",
+                bin: 870,
+                label: "Bin 870",
+                filename: "bin_870_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_871_phi_M.png",
+                bin: 871,
+                label: "Bin 871",
+                filename: "bin_871_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_872_phi_M.png",
+                bin: 872,
+                label: "Bin 872",
+                filename: "bin_872_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_873_phi_M.png",
+                bin: 873,
+                label: "Bin 873",
+                filename: "bin_873_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_874_phi_M.png",
+                bin: 874,
+                label: "Bin 874",
+                filename: "bin_874_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_875_phi_M.png",
+                bin: 875,
+                label: "Bin 875",
+                filename: "bin_875_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_876_phi_M.png",
+                bin: 876,
+                label: "Bin 876",
+                filename: "bin_876_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_877_phi_M.png",
+                bin: 877,
+                label: "Bin 877",
+                filename: "bin_877_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_878_phi_M.png",
+                bin: 878,
+                label: "Bin 878",
+                filename: "bin_878_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_879_phi_M.png",
+                bin: 879,
+                label: "Bin 879",
+                filename: "bin_879_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_880_phi_M.png",
+                bin: 880,
+                label: "Bin 880",
+                filename: "bin_880_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_881_phi_M.png",
+                bin: 881,
+                label: "Bin 881",
+                filename: "bin_881_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_882_phi_M.png",
+                bin: 882,
+                label: "Bin 882",
+                filename: "bin_882_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_883_phi_M.png",
+                bin: 883,
+                label: "Bin 883",
+                filename: "bin_883_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_884_phi_M.png",
+                bin: 884,
+                label: "Bin 884",
+                filename: "bin_884_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_885_phi_M.png",
+                bin: 885,
+                label: "Bin 885",
+                filename: "bin_885_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_886_phi_M.png",
+                bin: 886,
+                label: "Bin 886",
+                filename: "bin_886_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_887_phi_M.png",
+                bin: 887,
+                label: "Bin 887",
+                filename: "bin_887_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_891_phi_M.png",
+                bin: 891,
+                label: "Bin 891",
+                filename: "bin_891_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_893_phi_M.png",
+                bin: 893,
+                label: "Bin 893",
+                filename: "bin_893_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_897_phi_M.png",
+                bin: 897,
+                label: "Bin 897",
+                filename: "bin_897_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_900_phi_M.png",
+                bin: 900,
+                label: "Bin 900",
+                filename: "bin_900_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_901_phi_M.png",
+                bin: 901,
+                label: "Bin 901",
+                filename: "bin_901_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_902_phi_M.png",
+                bin: 902,
+                label: "Bin 902",
+                filename: "bin_902_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_903_phi_M.png",
+                bin: 903,
+                label: "Bin 903",
+                filename: "bin_903_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_904_phi_M.png",
+                bin: 904,
+                label: "Bin 904",
+                filename: "bin_904_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_905_phi_M.png",
+                bin: 905,
+                label: "Bin 905",
+                filename: "bin_905_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_906_phi_M.png",
+                bin: 906,
+                label: "Bin 906",
+                filename: "bin_906_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_907_phi_M.png",
+                bin: 907,
+                label: "Bin 907",
+                filename: "bin_907_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_908_phi_M.png",
+                bin: 908,
+                label: "Bin 908",
+                filename: "bin_908_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_909_phi_M.png",
+                bin: 909,
+                label: "Bin 909",
+                filename: "bin_909_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_910_phi_M.png",
+                bin: 910,
+                label: "Bin 910",
+                filename: "bin_910_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_911_phi_M.png",
+                bin: 911,
+                label: "Bin 911",
+                filename: "bin_911_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_912_phi_M.png",
+                bin: 912,
+                label: "Bin 912",
+                filename: "bin_912_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_913_phi_M.png",
+                bin: 913,
+                label: "Bin 913",
+                filename: "bin_913_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_914_phi_M.png",
+                bin: 914,
+                label: "Bin 914",
+                filename: "bin_914_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_915_phi_M.png",
+                bin: 915,
+                label: "Bin 915",
+                filename: "bin_915_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_916_phi_M.png",
+                bin: 916,
+                label: "Bin 916",
+                filename: "bin_916_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_917_phi_M.png",
+                bin: 917,
+                label: "Bin 917",
+                filename: "bin_917_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_918_phi_M.png",
+                bin: 918,
+                label: "Bin 918",
+                filename: "bin_918_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_919_phi_M.png",
+                bin: 919,
+                label: "Bin 919",
+                filename: "bin_919_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_920_phi_M.png",
+                bin: 920,
+                label: "Bin 920",
+                filename: "bin_920_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_921_phi_M.png",
+                bin: 921,
+                label: "Bin 921",
+                filename: "bin_921_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_922_phi_M.png",
+                bin: 922,
+                label: "Bin 922",
+                filename: "bin_922_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_923_phi_M.png",
+                bin: 923,
+                label: "Bin 923",
+                filename: "bin_923_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_924_phi_M.png",
+                bin: 924,
+                label: "Bin 924",
+                filename: "bin_924_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_925_phi_M.png",
+                bin: 925,
+                label: "Bin 925",
+                filename: "bin_925_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_926_phi_M.png",
+                bin: 926,
+                label: "Bin 926",
+                filename: "bin_926_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_927_phi_M.png",
+                bin: 927,
+                label: "Bin 927",
+                filename: "bin_927_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_928_phi_M.png",
+                bin: 928,
+                label: "Bin 928",
+                filename: "bin_928_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_929_phi_M.png",
+                bin: 929,
+                label: "Bin 929",
+                filename: "bin_929_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_930_phi_M.png",
+                bin: 930,
+                label: "Bin 930",
+                filename: "bin_930_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_931_phi_M.png",
+                bin: 931,
+                label: "Bin 931",
+                filename: "bin_931_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_932_phi_M.png",
+                bin: 932,
+                label: "Bin 932",
+                filename: "bin_932_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_933_phi_M.png",
+                bin: 933,
+                label: "Bin 933",
+                filename: "bin_933_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_934_phi_M.png",
+                bin: 934,
+                label: "Bin 934",
+                filename: "bin_934_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_935_phi_M.png",
+                bin: 935,
+                label: "Bin 935",
+                filename: "bin_935_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_936_phi_M.png",
+                bin: 936,
+                label: "Bin 936",
+                filename: "bin_936_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_937_phi_M.png",
+                bin: 937,
+                label: "Bin 937",
+                filename: "bin_937_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_938_phi_M.png",
+                bin: 938,
+                label: "Bin 938",
+                filename: "bin_938_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_939_phi_M.png",
+                bin: 939,
+                label: "Bin 939",
+                filename: "bin_939_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_940_phi_M.png",
+                bin: 940,
+                label: "Bin 940",
+                filename: "bin_940_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_941_phi_M.png",
+                bin: 941,
+                label: "Bin 941",
+                filename: "bin_941_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_942_phi_M.png",
+                bin: 942,
+                label: "Bin 942",
+                filename: "bin_942_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_943_phi_M.png",
+                bin: 943,
+                label: "Bin 943",
+                filename: "bin_943_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_944_phi_M.png",
+                bin: 944,
+                label: "Bin 944",
+                filename: "bin_944_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_945_phi_M.png",
+                bin: 945,
+                label: "Bin 945",
+                filename: "bin_945_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_946_phi_M.png",
+                bin: 946,
+                label: "Bin 946",
+                filename: "bin_946_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_947_phi_M.png",
+                bin: 947,
+                label: "Bin 947",
+                filename: "bin_947_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_948_phi_M.png",
+                bin: 948,
+                label: "Bin 948",
+                filename: "bin_948_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_949_phi_M.png",
+                bin: 949,
+                label: "Bin 949",
+                filename: "bin_949_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_950_phi_M.png",
+                bin: 950,
+                label: "Bin 950",
+                filename: "bin_950_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_951_phi_M.png",
+                bin: 951,
+                label: "Bin 951",
+                filename: "bin_951_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_952_phi_M.png",
+                bin: 952,
+                label: "Bin 952",
+                filename: "bin_952_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_953_phi_M.png",
+                bin: 953,
+                label: "Bin 953",
+                filename: "bin_953_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_955_phi_M.png",
+                bin: 955,
+                label: "Bin 955",
+                filename: "bin_955_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_956_phi_M.png",
+                bin: 956,
+                label: "Bin 956",
+                filename: "bin_956_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_957_phi_M.png",
+                bin: 957,
+                label: "Bin 957",
+                filename: "bin_957_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_958_phi_M.png",
+                bin: 958,
+                label: "Bin 958",
+                filename: "bin_958_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_959_phi_M.png",
+                bin: 959,
+                label: "Bin 959",
+                filename: "bin_959_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_961_phi_M.png",
+                bin: 961,
+                label: "Bin 961",
+                filename: "bin_961_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_962_phi_M.png",
+                bin: 962,
+                label: "Bin 962",
+                filename: "bin_962_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_965_phi_M.png",
+                bin: 965,
+                label: "Bin 965",
+                filename: "bin_965_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_967_phi_M.png",
+                bin: 967,
+                label: "Bin 967",
+                filename: "bin_967_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_969_phi_M.png",
+                bin: 969,
+                label: "Bin 969",
+                filename: "bin_969_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_970_phi_M.png",
+                bin: 970,
+                label: "Bin 970",
+                filename: "bin_970_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_973_phi_M.png",
+                bin: 973,
+                label: "Bin 973",
+                filename: "bin_973_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_979_phi_M.png",
+                bin: 979,
+                label: "Bin 979",
+                filename: "bin_979_phi_M.png"
+            },
+            {
+                src: "fit_result/bin_986_phi_M.png",
+                bin: 986,
+                label: "Bin 986",
+                filename: "bin_986_phi_M.png"
+            },
+        ];
+        
+        const gallery = document.getElementById('gallery');
+        const searchBox = document.getElementById('searchBox');
+        const columnsSelect = document.getElementById('columnsSelect');
+        const visibleCount = document.getElementById('visibleCount');
+        const totalCount = document.getElementById('totalCount');
+        const modal = document.getElementById('imageModal');
+        const modalImg = document.getElementById('modalImage');
+        const closeBtn = document.querySelector('.close');
+        const prevBtn = document.querySelector('.prev');
+        const nextBtn = document.querySelector('.next');
+        
+        let currentImageIndex = -1;
+        let visibleImages = [];
+        
+        // Initialize gallery
+        function renderGallery() {
+            gallery.innerHTML = '';
+            images.forEach((img, index) => {
+                const card = document.createElement('div');
+                card.className = 'image-card';
+                card.dataset.bin = img.bin;
+                card.dataset.index = index;
+                
+                card.innerHTML = `
+                    <div class="image-header">${img.label}</div>
+                    <div class="image-container">
+                        <img src="${img.src}" alt="${img.label}" loading="lazy">
+                    </div>
+                `;
+                
+                card.querySelector('.image-container').addEventListener('click', () => {
+                    openModal(index);
+                });
+                
+                gallery.appendChild(card);
+            });
+            
+            updateStats();
+        }
+        
+        // Search functionality
+        searchBox.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const cards = document.querySelectorAll('.image-card');
+            
+            cards.forEach(card => {
+                const binNum = card.dataset.bin;
+                if (searchTerm === '' || binNum.includes(searchTerm)) {
+                    card.classList.remove('hidden');
+                } else {
+                    card.classList.add('hidden');
+                }
+            });
+            
+            updateStats();
+        });
+        
+        // Column selection
+        columnsSelect.addEventListener('change', (e) => {
+            const columns = e.target.value;
+            const minWidth = Math.floor(1200 / columns);
+            gallery.style.gridTemplateColumns = `repeat(auto-fit, minmax(${minWidth}px, 1fr))`;
+        });
+        
+        // Modal functions
+        function openModal(index) {
+            visibleImages = Array.from(document.querySelectorAll('.image-card:not(.hidden)'))
+                .map(card => parseInt(card.dataset.index));
+            currentImageIndex = visibleImages.indexOf(index);
+            
+            modal.style.display = 'block';
+            modalImg.src = images[index].src;
+        }
+        
+        function closeModal() {
+            modal.style.display = 'none';
+        }
+        
+        function showPrevImage() {
+            if (currentImageIndex > 0) {
+                currentImageIndex--;
+                modalImg.src = images[visibleImages[currentImageIndex]].src;
+            }
+        }
+        
+        function showNextImage() {
+            if (currentImageIndex < visibleImages.length - 1) {
+                currentImageIndex++;
+                modalImg.src = images[visibleImages[currentImageIndex]].src;
+            }
+        }
+        
+        function updateStats() {
+            const visible = document.querySelectorAll('.image-card:not(.hidden)').length;
+            visibleCount.textContent = visible;
+            totalCount.textContent = images.length;
+        }
+        
+        // Event listeners
+        closeBtn.addEventListener('click', closeModal);
+        prevBtn.addEventListener('click', showPrevImage);
+        nextBtn.addEventListener('click', showNextImage);
+        
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+        
+        document.addEventListener('keydown', (e) => {
+            if (modal.style.display === 'block') {
+                if (e.key === 'Escape') closeModal();
+                if (e.key === 'ArrowLeft') showPrevImage();
+                if (e.key === 'ArrowRight') showNextImage();
+            }
+        });
+        
+        // Initialize
+        renderGallery();
+    </script>
+</body>
+</html>

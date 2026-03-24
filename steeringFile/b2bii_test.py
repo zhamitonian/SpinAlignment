@@ -104,6 +104,8 @@ ma.reconstructDecay('K*0:spin -> K+:spin pi-:spin', '0.6 < M < 1.2', path=main)
 ma.variablesToEventExtraInfo('K*0:spin', {'nParticlesInList(K*0:spin)':'NosKstar'}, option=2, path=main)
 variables.addAlias('NosKstar', 'ifNANgiveX(eventExtraInfo(NosKstar), 0)')
 
+variables.addAlias('thrustFrame_pt', 'useThrustFrame(pt)')
+
 # event shape variables
 event_vars  = ['Ecms', 'NosTrack', 'NosCluster', 'NosPhoton', 'SkimHad']  # Removed clusterE9E25 - it needs a Particle object
 event_vars += ['NosKstar', 'NosPhi', 'MissingMomCMS']
@@ -154,7 +156,7 @@ main.add_module('VariablesToEventBasedTree',
                 particleList='pi+:track', 
                 treeName='event_trk', 
                 event_variables=event_vars,
-                variables = kinematics)
+                variables = kinematics + ['thrustFrame_pt'])
 main.add_module('VariablesToEventBasedTree', 
                 fileName=steering_tools.output_file, 
                 particleList='gamma:cluster', 

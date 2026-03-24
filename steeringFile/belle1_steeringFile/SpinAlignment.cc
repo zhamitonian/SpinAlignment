@@ -583,6 +583,7 @@ void SpinAlignment::readMC()
                 Gen_hepevt& daughter = gen_hepevt_mgr(ID);
                 
                 int daughter_pid = daughter.idhep();
+                cout << "daughter: "<< i <<" pid: " << daughter_pid << endl;
                 if (abs(daughter_pid) != 321) continue; // only K+ and K-
                 
                 HepLorentzVector daughter_v4 (daughter.PX(), daughter.PY(), daughter.PZ(), daughter.E());

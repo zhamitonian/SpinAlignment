@@ -32,3 +32,9 @@ Draw*
 *.hbk
 
 fpda_pid.*
+
+*.lock
+
+status.md
+offline/draw/Phi_data_mc_comparsion/*.pdf.gz
+offline/draw/Phi_data_mc_comparsion/fit_results_viewer.html
