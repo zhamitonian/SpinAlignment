@@ -43,11 +43,10 @@ qqbar(udsc) -> phi/Kstar + anything
                 \-> K+ K-                                  
 just check event number of phi Kstar in Y(1S) offres (9.43GeV) data
 
-version : v1.0.0
-Date    : 2026.03.30
+version : v1.0.1
+Date    : 2026.03.31
 Author  : Zhen Wang
 
-derive from SpinAlignment_v2.1.2
 */
 
 #if defined(BELLE_NAMESPACE)
@@ -889,3 +888,6 @@ void SpinAlignment::other(int* , BelleEvent*, int* ){
 // version log 
 // v1.0.0
 // initial version
+// derive from SpinAlignment_v2.1.2
+// v1.0.1
+// change pt cut from 0.05 to 0.1 GeV/c
