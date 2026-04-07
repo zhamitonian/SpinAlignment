@@ -41,8 +41,8 @@ using namespace std;
 qqbar(udsc) -> phi+ + anything                             
          \-> K+ K-                                 
 
-version : v2.1.2
-Date    : 2025.12.03
+version : v2.1.3
+Date    : 2026.04.07
 Author  : Zhen Wang
 */
 
@@ -852,3 +852,7 @@ void SpinAlignment::other(int* , BelleEvent*, int* ){
 
 // v2.1.2 :
 // Save truth level kaon 's p, pt
+
+// v2.1.3 : 
+// cut pt 0.05 -> 0.1 GeV
+// Apr 07, 2026, Zheng Wang

@@ -23,7 +23,7 @@ double PI = 3.141592653589793;
 namespace cuts{
     double vertexZ = 4.0;
     double vertexR = 2.0;
-    double trkPt= 0.05;
+    double trkPt= 0.1;
     double trkP = 0.5;
     double trk_cosTheta_min = -0.511;
     double trk_cosTheta_max = 0.842;
