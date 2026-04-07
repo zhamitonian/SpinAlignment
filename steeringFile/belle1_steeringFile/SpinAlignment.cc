@@ -43,7 +43,7 @@ using namespace std;
 qqbar(udsc) -> phi+ + anything                             
          \-> K+ K-                                 
 
-version : v2.1.3
+version : v2.1.4
 Date    : 2026.04.07
 Author  : Zhen Wang
 */
@@ -455,12 +455,20 @@ for(Evtcls_hadron_neutral_Manager::iterator it = hadron_neu_mgr.begin();
         }
 
         // ---------------------------------------------------------
-        // match MC truth and retieve mother particle info
+        // match MC truth and retrieve mother particle info
         if (isMC == 1 && massHyp == 3) {
             const Gen_hepevt &gen = gen_level(get_hepevt(chg));
-            Gen_hepevt &mother = gen.mother();
-            int mc_mother_pdg = mother.idhep();
+
             int mc_pdg = gen.idhep();
+            int mc_mother_pdg = 0;
+            bool hasMother = false;
+
+            // Protect against missing/invalid mother to avoid segfaults
+            if (gen.mother()) {
+                Gen_hepevt &mother = gen.mother();
+                mc_mother_pdg = mother.idhep();
+                hasMother = true;
+            }
 
             HepLorentzVector p4_truth(gen.PX(), gen.PY(), gen.PZ(), gen.E());
             p4_truth.boost(kinematics.CMBoost);
@@ -468,7 +476,7 @@ for(Evtcls_hadron_neutral_Manager::iterator it = hadron_neu_mgr.begin();
             bool isKaon = false;
             bool fromPhi = false;
 
-            if (abs(mc_mother_pdg) == 333)
+            if (hasMother && abs(mc_mother_pdg) == 333)
                 fromPhi = true;
 
             if (mc_pdg * charge == 321)
@@ -918,4 +926,8 @@ void SpinAlignment::other(int* , BelleEvent*, int* ){
 
 // v2.1.3 : 
 // cut pt 0.05 -> 0.1 GeV; save costheta; save topo info.
+// Apr 07, 2026, Zheng Wang
+
+// v2.1.4 :
+// fix truth match bug
 // Apr 07, 2026, Zheng Wang
