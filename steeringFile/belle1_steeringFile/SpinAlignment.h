@@ -50,6 +50,7 @@ class SpinAlignment : public Module{
         void other(int*, BelleEvent*, int*);
         std::pair<double, double> calculateHeavyJetMassEnergy(const Vp4 &particles, const Hep3Vector &thrustAxis);
         std::pair<double, double> calculateSphericityAplanarity(const std::vector<HepLorentzVector>& particles);
+        void fillMCTruthForTopo();
 
     public: // BASF parameter
         char* output_filename;
@@ -125,6 +126,8 @@ class SpinAlignment : public Module{
         Vdouble km_pz_cms;
         Vdouble kp_p;
         Vdouble km_p;
+        Vdouble kp_costheta;
+        Vdouble km_costheta;
 
         Vbool kp_isSignal;
         Vbool km_isSignal;
@@ -155,6 +158,11 @@ class SpinAlignment : public Module{
         Vdouble km_pt_truth;                    
 
         bool isMC;
+
+        static const int MAX_MC_PARTICLES = 80;  // Adjust as needed
+        int m_nMCGen;
+        double m_MCGenPDG[MAX_MC_PARTICLES];
+        double m_MCGenMothIndex[MAX_MC_PARTICLES];
 };
 
 

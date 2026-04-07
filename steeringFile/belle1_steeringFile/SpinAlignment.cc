@@ -1,6 +1,8 @@
 #include "belle.h"
 #include <cmath>
 #include <algorithm>
+#include <limits>
+#include <map>
 
 #include "event/BelleEvent.h"
 #include "tuple/BelleTupleManager.h"
@@ -143,6 +145,13 @@ void SpinAlignment::hist_def(){
 
     ADDBARRAY(thrust, 3, D);
     
+    if (isMC) {
+        tree->Branch("nMCGen", &m_nMCGen, "nMCGen/I");
+        for (int i = 0; i < MAX_MC_PARTICLES; i++) {
+            tree->Branch(Form("MCGenPDG_%d", i), &m_MCGenPDG[i], Form("MCGenPDG_%d/D", i));
+            tree->Branch(Form("MCGenMothIndex_%d", i), &m_MCGenMothIndex[i], Form("MCGenMothIndex_%d/D", i));
+        }
+    }
 
     if (isMC){
         mctree->Branch("kp_E_cms_truth", &kp_E_cms_truth);
@@ -177,6 +186,8 @@ void SpinAlignment::hist_def(){
 
     tree->Branch("kp_p", &kp_p);
     tree->Branch("km_p", &km_p);
+    tree->Branch("kp_costheta", &kp_costheta);
+    tree->Branch("km_costheta", &km_costheta);
 
     if(isMC){
         tree->Branch("kp_E_cms_gen", &kp_E_cms_gen);
@@ -347,7 +358,6 @@ for(Evtcls_hadron_neutral_Manager::iterator it = hadron_neu_mgr.begin();
     //cout << "read: " << Thrust << " calc: " << ThrParam << endl; 
     // ----------------------------------------------------------------------------------
     
-
     // start our selection
     Vp3 hadrons_p3_cms;
     Vp4 hadrons_p4_cms;
@@ -364,6 +374,8 @@ for(Evtcls_hadron_neutral_Manager::iterator it = hadron_neu_mgr.begin();
 
     kp_p.clear();
     km_p.clear();
+    kp_costheta.clear();
+    km_costheta.clear();
 
     if (isMC){
         kp_isSignal.clear();
@@ -499,6 +511,7 @@ for(Evtcls_hadron_neutral_Manager::iterator it = hadron_neu_mgr.begin();
                 kp_py_cms.push_back(p4_boosted.py());
                 kp_pz_cms.push_back(p4_boosted.pz());
                 kp_p.push_back(vec_p3.mag());
+                kp_costheta.push_back(cosTheta);
             }
             else if(charge == -1)  {
                 km_E_cms.push_back(p4_boosted.e());
@@ -506,6 +519,7 @@ for(Evtcls_hadron_neutral_Manager::iterator it = hadron_neu_mgr.begin();
                 km_py_cms.push_back(p4_boosted.py());
                 km_pz_cms.push_back(p4_boosted.pz());
                 km_p.push_back(vec_p3.mag());
+                km_costheta.push_back(cosTheta);
             }
         }
 
@@ -531,6 +545,10 @@ for(Evtcls_hadron_neutral_Manager::iterator it = hadron_neu_mgr.begin();
     m_info.sqrts = kinematics.cm.m();
     double thrust_vec[3] = { thr.mag(), thr.z()/thr.mag(), thr.phi() };
     memcpy(m_info.thrust, thrust_vec, sizeof(thrust_vec));
+
+    if (isMC){
+        fillMCTruthForTopo();
+    }
 
     tree->Fill();
 
@@ -828,6 +846,51 @@ std::pair<double, double> SpinAlignment::calculateSphericityAplanarity(const std
     dz  = helix.dz();
 }
 
+void SpinAlignment::fillMCTruthForTopo() {
+    // Initialize
+    m_nMCGen = 0;
+    for (int i = 0; i < MAX_MC_PARTICLES; i++) {
+        m_MCGenPDG[i] = std::numeric_limits<double>::quiet_NaN();
+        m_MCGenMothIndex[i] = std::numeric_limits<double>::quiet_NaN();
+    }
+
+    Gen_hepevt_Manager& gen_mgr = Gen_hepevt_Manager::get_manager();
+
+    // First pass: filter valid generator-level particles and build ID to new index map
+    std::vector<const Gen_hepevt*> valid_particles;
+    std::map<int, int> id_to_idx;
+    int idx = 0;
+    for (Gen_hepevt_Manager::iterator it = gen_mgr.begin(); it != gen_mgr.end(); ++it) {
+        int pdg = it->idhep();
+        int status = it->isthep();
+        // Only keep particles with valid PDG and generator status
+        if (pdg == 0) continue;
+        if (abs(pdg) > 1e7) continue; // skip junk
+        if (!(status == 1 || status == 2)) continue; // only final/intermediate
+        valid_particles.push_back(&(*it));
+        id_to_idx[it->get_ID()] = idx;
+        idx++;
+        if (idx >= MAX_MC_PARTICLES) break;
+    }
+
+    // Second pass: fill arrays
+    for (size_t i = 0; i < valid_particles.size(); ++i) {
+        const Gen_hepevt* it = valid_particles[i];
+        m_MCGenPDG[i] = static_cast<double>(it->idhep());
+        // Get mother index
+        if (it->mother()) {
+            int mother_id = it->mother().get_ID();
+            if (id_to_idx.find(mother_id) != id_to_idx.end()) {
+                m_MCGenMothIndex[i] = static_cast<double>(id_to_idx[mother_id]);
+            } else {
+                m_MCGenMothIndex[i] = -1.0;
+            }
+        } else {
+            m_MCGenMothIndex[i] = -1.0;  // No mother
+        }
+    }
+    m_nMCGen = valid_particles.size();
+}
 
 void SpinAlignment::other(int* , BelleEvent*, int* ){
     return;
@@ -854,5 +917,5 @@ void SpinAlignment::other(int* , BelleEvent*, int* ){
 // Save truth level kaon 's p, pt
 
 // v2.1.3 : 
-// cut pt 0.05 -> 0.1 GeV
+// cut pt 0.05 -> 0.1 GeV; save costheta; save topo info.
 // Apr 07, 2026, Zheng Wang
