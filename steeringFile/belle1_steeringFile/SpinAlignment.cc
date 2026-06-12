@@ -43,8 +43,8 @@ using namespace std;
 qqbar(udsc) -> phi+ + anything                             
          \-> K+ K-                                 
 
-version : v2.1.4
-Date    : 2026.04.07
+version : v2.1.5
+Date    : 2026.06.11
 Author  : Zhen Wang
 */
 
@@ -650,7 +650,7 @@ void SpinAlignment::readMC()
             //    continue;
 
             //if (gen_it->E() > 0.1) { // same cut as in reconstructed level
-            //    allParticlesCMS_truth.push_back(v4tmp.vect());
+              allParticlesCMS_truth.push_back(v4tmp.vect());
             //}
         }
 
@@ -931,3 +931,7 @@ void SpinAlignment::other(int* , BelleEvent*, int* ){
 // v2.1.4 :
 // fix truth match bug
 // Apr 07, 2026, Zheng Wang
+
+// v2.1.5 
+// save truth level thrust info
+// Jun 11, 2026, Zheng Wang
