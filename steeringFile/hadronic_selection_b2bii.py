@@ -3,6 +3,9 @@
 
 ############################################
 # b2bii hadronic selection
+# version : v1.0.0
+# Author  : Zheng Wang
+# Date    : XX.XX.XX
 ############################################
 
 # Import and mdst loading
