@@ -3,9 +3,9 @@
 
 ############################################
 # b2bii hadronic selection
-# version : v1.0.0
+# version : v1.0.1
 # Author  : Zheng Wang
-# Date    : XX.XX.XX
+# Date    : 2026.08.17
 ############################################
 
 # Import and mdst loading
@@ -49,11 +49,9 @@ photon_cut = "E > 0.1 and clusterBelleQuality == 0"
 ma.cutAndCopyList('gamma:photon', 'gamma:mdst', photon_cut, path = main) # gamma:mdst <=> Mdst_gamma_Manager
 
 ## event cut
-#variables.addAlias("Evis", "(sumValueInList(pi+:track, useCMSFrame(E)) + sumValueInList(gamma:photon, useCMSFrame(E)))") # two Evis definitions has some difference ???
-variables.addAlias('Evis', 'formula( useCMSFrame(totalEnergyOfParticlesInList(pi+:track)) + useCMSFrame(totalEnergyOfParticlesInList(gamma:photon)) )')
-#ma.applyEventCuts("Evis > 7.0", path = main) # don't know why could not apply event cut directly here
-ma.applyCuts("gamma:photon", "Evis > 7.0", path = main)
-ma.applyCuts("pi+:track", "Evis > 7.0", path = main)
+variables.addAlias("Evis_track", "sumValueInList(pi+:track, useCMSFrame(E))")
+variables.addAlias("Evis_gamma", "sumValueInList(gamma:photon, useCMSFrame(E))")
+variables.addAlias("Evis", "formula(Evis_track + Evis_gamma)") # to make Evis a basf2 event variable
 
 ## saving variables same as in Evtcls_hadron_info_Manager
 variables.addAlias("Ntrk", "countInList(pi+:track)")
@@ -88,3 +86,13 @@ main.add_module('VariablesToEventBasedTree',
 
 b2.process(main)
 print(b2.statistics)
+
+
+"""
+# version log 
+## v1.0.0 
+
+## v1.0.1
+- use sumValueInList instead of totalEnergyOfParticlesInList to calculate Evis, making it a basf2 event variable, so that it can be used in event var
+- date : 2026-08-17
+"""
