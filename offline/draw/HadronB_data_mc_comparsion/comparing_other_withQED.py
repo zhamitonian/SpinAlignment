@@ -241,33 +241,47 @@ class comparing:
         pad2.Draw()
 
         c_all.Update()
-        style_draw([h_other_qed, h_tautau, h_ccbar, h_uds, h_data], "", 
-                   ["other qed mc", "#tau^{+}#tau^{-}", 'c#bar{c}' , 'uds','data'],
-                   styles = [HistStyle.filled_hist(6, 3006), 
-                             HistStyle.filled_hist(4, 3007),
-                             HistStyle.filled_hist(3, 3011),
-                             HistStyle.filled_hist(2, 0),
-                             HistStyle.error_bars(1)],
-                   pad = pad1, save=False, legend_position= leg_position)
-        h_ratio = h_MC.Clone("h_ratio")
-        h_ratio.Sumw2()
-        h_ratio.Divide(h_MC, h_data, 1, 1, "B")
-        h_ratio.GetYaxis().SetTitle("ratio")
 
-        h_ratio.GetXaxis().SetLabelSize(0.10)   # X轴标签大小，因为pad2较小，需要更大
-        h_ratio.GetYaxis().SetLabelSize(0.10)   # Y轴标签大小
-        h_ratio.GetXaxis().SetTitleSize(0.16)   # X轴标题大小
-        h_ratio.GetYaxis().SetTitleSize(0.14)   # Y轴标题大小
-        h_ratio.GetXaxis().SetLabelFont(22)     # 字体 (42=Helvetica)
-        h_ratio.GetYaxis().SetLabelFont(22)
-        h_ratio.GetXaxis().SetTitleFont(22)
-        h_ratio.GetYaxis().SetTitleFont(22)
-        h_ratio.GetXaxis().SetTitleOffset(0.8)  # 标题偏移
-        h_ratio.GetYaxis().SetTitleOffset(0.4)  # Y轴标题偏移
+        with_ratio = False
+        if with_ratio:
+            style_draw([h_other_qed, h_tautau, h_ccbar, h_uds, h_data], "", 
+                    ["other QED MC", "#tau^{+}#tau^{-}", 'c#bar{c}' , 'uds','data'],
+                    styles = [HistStyle.filled_hist(6, 3006), 
+                                HistStyle.filled_hist(4, 3007),
+                                HistStyle.filled_hist(3, 3011),
+                                HistStyle.filled_hist(2, 0),
+                                HistStyle.error_bars(1)],
+                    pad = pad1, save=False, legend_position= leg_position)
+            h_ratio = h_MC.Clone("h_ratio")
+            h_ratio.Sumw2()
+            h_ratio.Divide(h_MC, h_data, 1, 1, "B")
+            h_ratio.GetYaxis().SetTitle("ratio")
 
-        png_name = f"{var.replace('[','_').replace(']','_')}"
-        png_file = os.path.join(output_dir, f"{png_name}.png")
-        style_draw([h_ratio], png_file, styles = [HistStyle.error_bars(1)], y_min= 0, y_max=2, use_user_y_range= True,pad= pad2 )
+            h_ratio.GetXaxis().SetLabelSize(0.10)   # X轴标签大小，因为pad2较小，需要更大
+            h_ratio.GetYaxis().SetLabelSize(0.10)   # Y轴标签大小
+            h_ratio.GetXaxis().SetTitleSize(0.16)   # X轴标题大小
+            h_ratio.GetYaxis().SetTitleSize(0.14)   # Y轴标题大小
+            h_ratio.GetXaxis().SetLabelFont(22)     # 字体 (42=Helvetica)
+            h_ratio.GetYaxis().SetLabelFont(22)
+            h_ratio.GetXaxis().SetTitleFont(22)
+            h_ratio.GetYaxis().SetTitleFont(22)
+            h_ratio.GetXaxis().SetTitleOffset(0.8)  # 标题偏移
+            h_ratio.GetYaxis().SetTitleOffset(0.4)  # Y轴标题偏移
+
+            png_name = f"{var.replace('[','_').replace(']','_')}"
+            png_file = os.path.join(output_dir, f"{png_name}.png")
+            style_draw([h_ratio], png_file, styles = [HistStyle.error_bars(1)], y_min= 0, y_max=2, use_user_y_range= True,pad= pad2 )
+        else:
+            png_name = f"{var.replace('[','_').replace(']','_')}"
+            png_file = os.path.join(output_dir, f"{png_name}.png")
+            style_draw([h_other_qed, h_tautau, h_ccbar, h_uds, h_data], png_file, 
+                    ["other QED MC", "#tau^{+}#tau^{-}", 'c#bar{c}' , 'uds','data'],
+                    styles = [HistStyle.filled_hist(6, 3006), 
+                                HistStyle.filled_hist(4, 3007),
+                                HistStyle.filled_hist(3, 3011),
+                                HistStyle.filled_hist(2, 0),
+                                HistStyle.error_bars(1)],
+                    legend_position= leg_position)
 
 
     def start_plotting(self):
@@ -300,8 +314,8 @@ class comparing:
         ]
 
 
-        for var in var_list:
-        #for var in ["h_Evis"]:
+        #for var in var_list:
+        for var in ["h_Ntrk"]:
             data_hist = self._get_data_hist(var)
             uds_hist, ccbar_hist = self._get_qqbar_hist(var)
             uds_hist.Scale(1.0/4)

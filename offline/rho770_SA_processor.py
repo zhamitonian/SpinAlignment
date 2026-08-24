@@ -14,116 +14,129 @@ from typing import Optional, Tuple
 sys.path.append("/home/belle2/wangz/Work/SpinAlignment/offline/draw/belle_kid_eff/")
 from get_pid_eff_weight import get_weight
     
-def reco(df:R.RDataFrame, hasPhi:bool=False, truth_match:bool=False, cut_phi_thrust_costheta:bool=False):
+def reco(df:R.RDataFrame, hasrho:bool=False, truth_match:bool=False, cut_meson_thrust_costheta:bool=False):
     """
-    inclusive phi , rho00 measurement, reconstruction level processing
+    inclusive rho(770), rho00 measurement, reconstruction level processing
     """
-    phi_vars = []
-    phi_vars_toSave = []
-    kaon_vars = ["px_cms", "py_cms", "pz_cms", "E_cms"]
-    kaon_vars_toSave = []
+    rho_vars = []
+    rho_vars_toSave = []
+    pion_vars = ["px_cms", "py_cms", "pz_cms", "E_cms", "p", "costheta"]
+    pion_vars_toSave = []
 
-    is_MC = "kp_isSignal" in df.GetColumnNames()
+    is_MC = "pip_isSignal" in df.GetColumnNames()
     tools = RDF_process()
 
     # --- MC-only pre-selection ---
     if is_MC:
-        kaon_vars += ["isSignal"]
-        kaon_vars_toSave += ["isSignal"]
+        pion_vars += ["isSignal"]
+        pion_vars_toSave += ["isSignal"]
         if truth_match:
-            for kaon in ["kp", "km"]:
-                for var in kaon_vars:
-                    df = df.Redefine(f"{kaon}_{var}", f"{kaon}_{var}[{kaon}_isSignal]")
-        elif hasPhi:  # require at least one truth-level phi
-            df = df.Filter("n_phi_truth > 0", "has truth phi")
-        df = get_weight(df, period="svd2", is_pion=False, cut_value=6, particle_names=("kp", "km"))
-        kaon_vars += ["pid_weight"]
-        kaon_vars_toSave += ["pid_weight"]
+            for pion in ["pip", "pim"]:
+                for var in pion_vars:
+                    df = df.Redefine(f"{pion}_{var}", f"{pion}_{var}[{pion}_isSignal]")
+        elif hasrho:  # require at least one truth-level rho
+            df = df.Filter("n_rho_truth > 0", "has truth rho")
+        df = get_weight(df, period="svd2", is_pion=True, cut_value=6, particle_names=("pip", "pim"))
+        pion_vars += ["pid_weight"]
+        pion_vars_toSave += ["pid_weight"]
+  
+
+    # --- pion momentum pre-selection ---
+    for pion in ["pip", "pim"]:
+        df = df.Define(f"{pion}_p_cut", f"{pion}_p > 0.5") # 0.5 GeV/c cut
+        for var in pion_vars:
+            df = df.Redefine(f"{pion}_{var}", f"{pion}_{var}[{pion}_p_cut]")
+
+    df = df.Filter("pip_p.size() > 0 && pim_p.size() > 0", "has at least one pion pair after momentum cut")
 
 
-    # --- Build all K+K- pairs ---
+    # --- Build all pi+pi- pairs ---
     df = tools.save_all_pairs(
         df,
-        p1_branches=("kp_px_cms", "kp_py_cms", "kp_pz_cms"),
-        p2_branches=("km_px_cms", "km_py_cms", "km_pz_cms"),
-        mass=(0.493677, 0.493677),
-        particle_name=("phi", "kp", "km"),
+        p1_branches=("pip_px_cms", "pip_py_cms", "pip_pz_cms"),
+        p2_branches=("pim_px_cms", "pim_py_cms", "pim_pz_cms"),
+        mass=(0.139570, 0.139570),
+        particle_name=("rho", "pip", "pim"),
     )
-    phi_vars += ["phi_E", "phi_px", "phi_py", "phi_pz", "kp_index", "km_index", "phi_helicity_angle", "phi_helicity_phi"]
-    phi_vars_toSave += ["kp_index", "km_index", "phi_helicity_angle", "phi_helicity_phi"]
+    rho_vars += ["rho_E", "rho_px", "rho_py", "rho_pz", "pip_index", "pim_index", "rho_helicity_angle", "rho_helicity_phi"]
+    rho_vars_toSave += ["pip_index", "pim_index", "rho_helicity_angle", "rho_helicity_phi"]
 
     ## Fold azimuthal angle by quadrant: result in [0, pi/2]
-    df = df.Redefine("phi_helicity_phi",
-                     "TMath::Pi()/2 - abs(fmod(phi_helicity_phi, TMath::Pi()) - TMath::Pi()/2)")
+    df = df.Redefine("rho_helicity_phi",
+                     "TMath::Pi()/2 - abs(fmod(rho_helicity_phi, TMath::Pi()) - TMath::Pi()/2)")
 
 
-    # --- Apply KK mass window (KK threshold ~0.987 GeV) --- cut 1
-    df = df.Define("phi_M", "sqrt(phi_E*phi_E - phi_px*phi_px - phi_py*phi_py - phi_pz*phi_pz)")
-    phi_vars.append("phi_M")
-    phi_vars_toSave.append("phi_M")
+    # --- Apply rho mass window (rho threshold ~0.770 GeV) --- cut 1
+    df = df.Define("rho_M", "sqrt(rho_E*rho_E - rho_px*rho_px - rho_py*rho_py - rho_pz*rho_pz)")
+    rho_vars.append("rho_M")
+    rho_vars_toSave.append("rho_M")
 
-    phi_mass_window = (0.99, 1.15)
+    from DRAW import style_draw
+    hist = df.Histo1D(("", ";m_{#pi^{+}#pi^{-}} (GeV/c^{2});[MeV]", 100, 0.5, 1), "rho_M")
+    style_draw([hist], "rho_mass.png")
+
+    rho_mass_window = (0.770 - 0.150, 0.770 + 0.150)
     df = df.Define("mass_window_pass",
-                   f"(phi_M > {phi_mass_window[0]}) && (phi_M < {phi_mass_window[1]})")
-    for var in phi_vars:
+                   f"(rho_M > {rho_mass_window[0]}) && (rho_M < {rho_mass_window[1]})")
+    for var in rho_vars:
         df = df.Redefine(var, f"{var}[mass_window_pass]")
 
-    df = df.Filter("phi_M.size() > 0", "has phi after mass window cut")
+    df = df.Filter("rho_M.size() > 0", "has rho after mass window cut")
 
     # --- Calculate angles related to thrust axis --- theta < 90^\circ cut 2 
-    if cut_phi_thrust_costheta:
+    if cut_meson_thrust_costheta:
         df = tools.calculate_pt_toAxis(
             df,
-            particle=("phi_px", "phi_py", "phi_pz"),
+            particle=("rho_px", "rho_py", "rho_pz"),
             axis=("TMath::ACos(thrust[1])", "thrust[2]"),
-            particle_name="phi", axis_name="thrust",
+            particle_name="rho", axis_name="thrust",
         )
-        phi_vars += ["phi_thrust_pt", "phi_thrust_costheta"]
-        phi_vars_toSave += ["phi_thrust_pt", "phi_thrust_costheta"]
+        rho_vars += ["rho_thrust_pt", "rho_thrust_costheta"]
+        rho_vars_toSave += ["rho_thrust_pt", "rho_thrust_costheta"]
 
-        df = df.Define("phi_thrust_costheta_pass", "phi_thrust_costheta > 0")
-        for var in phi_vars:
-            df = df.Redefine(var, f"{var}[phi_thrust_costheta_pass]")
+        df = df.Define("rho_thrust_costheta_pass", "rho_thrust_costheta > 0")
+        for var in rho_vars:
+            df = df.Redefine(var, f"{var}[rho_thrust_costheta_pass]")
 
-        df = df.Filter("phi_M.size() > 0", "has phi after thrust costheta cut")
+        df = df.Filter("rho_M.size() > 0", "has rho after thrust costheta cut")
 
 
     # --- calculate other variables
 
     ## --- thrust , polarization angles --- 
-    df = tools.cal_pola_angles(df, ("kp_px_cms", "kp_py_cms", "kp_pz_cms"),
-                            ("km_px_cms", "km_py_cms", "km_pz_cms"),
-                            (0.493677, 0.493677), ("thrust[1]", "thrust[2]"), ("kp_index", "km_index"),
-                            ("phi_thrust_helicity_costheta", "phi_thrust_helicity_phi"))
-    phi_vars += ["phi_thrust_helicity_costheta", "phi_thrust_helicity_phi"]
-    phi_vars_toSave += ["phi_thrust_helicity_costheta", "phi_thrust_helicity_phi"]
+    df = tools.cal_pola_angles(df, ("pip_px_cms", "pip_py_cms", "pip_pz_cms"),
+                            ("pim_px_cms", "pim_py_cms", "pim_pz_cms"),
+                            (0.139570, 0.139570), ("thrust[1]", "thrust[2]"), ("pip_index", "pim_index"),
+                            ("rho_thrust_helicity_costheta", "rho_thrust_helicity_phi"))
+    rho_vars += ["rho_thrust_helicity_costheta", "rho_thrust_helicity_phi"]
+    rho_vars_toSave += ["rho_thrust_helicity_costheta", "rho_thrust_helicity_phi"]
 
-    df = df.Redefine("phi_thrust_helicity_phi",
-                     "TMath::Pi()/2 - abs(fmod(phi_thrust_helicity_phi, TMath::Pi()) - TMath::Pi()/2)")
+    df = df.Redefine("rho_thrust_helicity_phi",
+                     "TMath::Pi()/2 - abs(fmod(rho_thrust_helicity_phi, TMath::Pi()) - TMath::Pi()/2)")
     
     ## --- MC-only: PID efficiency weight per pair ---
     if is_MC:
         df = df.Define(
-            "phi_weight",
-            "ROOT::VecOps::Take(kp_pid_weight, kp_index) * "
-            "ROOT::VecOps::Take(km_pid_weight, km_index)",
+            "rho_weight",
+            "ROOT::VecOps::Take(pip_pid_weight, pip_index) * "
+            "ROOT::VecOps::Take(pim_pid_weight, pim_index)",
         )
-        phi_vars.append("phi_weight")
-        phi_vars_toSave.append("phi_weight")
+        rho_vars.append("rho_weight")
+        rho_vars_toSave.append("rho_weight")
 
     ## --- other Kinematic variables ---
-    df = tools.convert_cartesian_to_spherical(df, particles=["phi"])
-    df = tools.convert_cartesian_to_spherical(df, particles=["kp", "km"],
+    df = tools.convert_cartesian_to_spherical(df, particles=["rho"])
+    df = tools.convert_cartesian_to_spherical(df, particles=["pip", "pim"],
                                                px_branch="px_cms", py_branch="py_cms", pz_branch="pz_cms")
-    df = df.Define("phi_z",  "2*phi_E/sqrts")
-    phi_vars += ["phi_costheta", "phi_phi", "phi_p", "phi_z"]
-    phi_vars_toSave += ["phi_costheta", "phi_phi", "phi_p", "phi_z"]
-    kaon_vars += ["p", "costheta", "phi"]
-    kaon_vars_toSave += ["p", "costheta", "phi"]
+    df = df.Define("rho_z",  "2*rho_E/sqrts")
+    rho_vars += ["rho_costheta", "rho_phi", "rho_p", "rho_z"]
+    rho_vars_toSave += ["rho_costheta", "rho_phi", "rho_p", "rho_z"]
+    pion_vars += ["p", "costheta", "phi"]
+    pion_vars_toSave += ["p", "costheta", "phi"]
 
     # --- Branches to save ---
-    Br2Save = phi_vars_toSave + \
-        ["kp_" + var for var in kaon_vars_toSave] + ["km_" + var for var in kaon_vars_toSave] + \
+    Br2Save = rho_vars_toSave + \
+        ["pip_" + var for var in pion_vars_toSave] + ["pim_" + var for var in pion_vars_toSave] + \
         ["thrust"]
 
     df.Report().Print()
@@ -132,58 +145,50 @@ def reco(df:R.RDataFrame, hasPhi:bool=False, truth_match:bool=False, cut_phi_thr
 
 
 
-def truth(df:R.RDataFrame, kaon_inBarrel:bool=False):
+def truth(df:R.RDataFrame):
     """
-    process truth tree, retrieve coordinate generate leavel phi's z, cos*theta ...
+    process truth tree, retrieve coordinate generate leavel rho's z, cos*theta ...
     """
-    phi_vars = []
-    phi_vars_toSave = []
-    kaon_vars = ["px", "py", "pz", "E"]
-    kaon_vars = ["kp_" + var + "_cms_truth" for var in kaon_vars] + ["km_" + var + "_cms_truth" for var in kaon_vars]
+    rho_vars = []
+    rho_vars_toSave = []
+    pion_vars = ["px", "py", "pz", "E"]
+    pion_vars = ["pip_" + var + "_cms_truth" for var in pion_vars] + ["pim_" + var + "_cms_truth" for var in pion_vars]
 
     tools = RDF_process()
 
     
-    # --- pre-selection ---
-    if kaon_inBarrel:
-        kaon_inBarrel = f"cos(kp_theta*{pi}/180) < 0.842 && cos(kp_theta*{pi}/180) > -0.511 && cos(km_theta*{pi}/180) < 0.842 && cos(km_theta*{pi}/180) > -0.511 && kp_pt_truth > 0.05 && km_pt_truth > 0.05" # type: ignore
-        for var in ["px", "py", "pz"]:
-            for kaon in ["kp", "km"]:
-                df = df.Redefine(f"{kaon}_{var}_cms_truth", f"{kaon}_{var}_cms_truth[{kaon_inBarrel}]")
-        
-
-    # --- Build all K+K- pairs and compute invariant mass ---
+    # --- Build all pi+pi- pairs and compute invariant mass ---
     df = tools.save_all_pairs(df, 
-                         p1_branches=("kp_px_cms_truth","kp_py_cms_truth","kp_pz_cms_truth"),
-                         p2_branches=("km_px_cms_truth","km_py_cms_truth","km_pz_cms_truth"),
-                         mass=(0.493677, 0.493677),
-                         particle_name=("phi","kp","km"),
+                         p1_branches=("pip_px_cms_truth","pip_py_cms_truth","pip_pz_cms_truth"),
+                         p2_branches=("pim_px_cms_truth","pim_py_cms_truth","pim_pz_cms_truth"),
+                         mass=(0.139570, 0.139570),
+                         particle_name=("rho","pip","pim"),
                          cross_mode= False)
-    phi_vars += ["phi_E", "phi_px", "phi_py", "phi_pz", "kp_index", "km_index", "phi_helicity_angle", "phi_helicity_phi"]
-    phi_vars_toSave += ["kp_index", "km_index", "phi_helicity_angle", "phi_helicity_phi"]
+    rho_vars += ["rho_E", "rho_px", "rho_py", "rho_pz", "pip_index", "pim_index", "rho_helicity_angle", "rho_helicity_phi"]
+    rho_vars_toSave += ["pip_index", "pim_index", "rho_helicity_angle", "rho_helicity_phi"]
 
-    ## fold by quadrant : pi/2 - |fmod(phi, pi) - pi/2|, result in [0, pi/2]
-    df = df.Redefine("phi_helicity_phi",
-                   "TMath::Pi()/2 - abs(fmod(phi_helicity_phi, TMath::Pi()) - TMath::Pi()/2)")
+    ## fold by quadrant : pi/2 - |fmod(rho, pi) - pi/2|, result in [0, pi/2]
+    df = df.Redefine("rho_helicity_phi",
+                   "TMath::Pi()/2 - abs(fmod(rho_helicity_phi, TMath::Pi()) - TMath::Pi()/2)")
     
     # --- calculate thrust pola angles ---
-    df = tools.cal_pola_angles(df, ("kp_px_cms_truth", "kp_py_cms_truth", "kp_pz_cms_truth"),
-                            ("km_px_cms_truth", "km_py_cms_truth", "km_pz_cms_truth"),
-                            (0.493677, 0.493677), ("thrust_truth[1]", "thrust_truth[2]"), ("kp_index", "km_index"),
-                            ("phi_thrust_helicity_costheta", "phi_thrust_helicity_phi"))
-    phi_vars += ["phi_thrust_helicity_costheta", "phi_thrust_helicity_phi"]
-    phi_vars_toSave += ["phi_thrust_helicity_costheta", "phi_thrust_helicity_phi"]
+    df = tools.cal_pola_angles(df, ("pip_px_cms_truth", "pip_py_cms_truth", "pip_pz_cms_truth"),
+                            ("pim_px_cms_truth", "pim_py_cms_truth", "pim_pz_cms_truth"),
+                            (0.139570, 0.139570), ("thrust_truth[1]", "thrust_truth[2]"), ("pip_index", "pim_index"),
+                            ("rho_thrust_helicity_costheta", "rho_thrust_helicity_phi"))
+    rho_vars += ["rho_thrust_helicity_costheta", "rho_thrust_helicity_phi"]
+    rho_vars_toSave += ["rho_thrust_helicity_costheta", "rho_thrust_helicity_phi"]
 
 
     # --- calculate other variables
-    df = df.Define("phi_M", "sqrt(phi_E*phi_E - phi_px*phi_px - phi_py*phi_py - phi_pz*phi_pz)")
-    df = df.Define("phi_z", f"2*phi_E/10.516469955444336")
-    phi_vars += ["phi_M", "phi_z"]
-    phi_vars_toSave += ["phi_M", "phi_z"]
+    df = df.Define("rho_M", "sqrt(rho_E*rho_E - rho_px*rho_px - rho_py*rho_py - rho_pz*rho_pz)")
+    df = df.Define("rho_z", f"2*rho_E/10.516469955444336")
+    rho_vars += ["rho_M", "rho_z"]
+    rho_vars_toSave += ["rho_M", "rho_z"]
     
 
     # --- Branches to save ---
-    Br2Save = phi_vars_toSave + kaon_vars
+    Br2Save = rho_vars_toSave + pion_vars
     df.Report().Print()
 
     return (df, Br2Save)

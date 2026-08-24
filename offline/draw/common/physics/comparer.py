@@ -8,6 +8,7 @@ import ROOT as R
 from common.plot.comparison_plotter import plot_data_mc
 from common.config.comparison import DEFAULT_VAR_CONFIG, DEFAULT_KS_WEIGHT_CONFIG
 from OFFLINE_PROCESS import RDF_process
+from FIT.utils.tree_splitter import TreeSplitter
 
 class DataMcComparer:
     _cpp_functions_defined = False
@@ -73,7 +74,8 @@ class DataMcComparer:
             )
             DataMcComparer._cpp_functions_defined = True
 
-    def _declare_daughter_functions(self):
+    def _declare_daughter_functions(self): 
+        # the distribution of daughter comes from the mother, may have multiple mother for a daughter.
         if not DataMcComparer._daughter_functions_defined:
             R.gInterpreter.Declare(
                 r"""
@@ -232,15 +234,23 @@ class DataMcComparer:
             self._plot_pair(h_data, h_mc, var, leg_position=2, normalize=True)
 
 
-def process_single_bin(flat_bin_idx, binning_config, var_list, data_root_dir, splot_root_dir, mc_rootfile, batch_output_dir, mc_weight_config=DEFAULT_KS_WEIGHT_CONFIG, reweight_var=None):
-    bins = [len(binning_list) - 1 for binning_list in binning_config.values()]
-    total_bins = int(np.prod(bins))
-    pad_width = len(str(total_bins - 1))
-    os.makedirs(batch_output_dir, exist_ok=True)
+def process_single_bin(flat_bin_idx, binning_config, var_list, data_root_dir, splot_root_dir, mc_rootfile, batch_output_dir, vec_branches = None,mc_weight_config=DEFAULT_KS_WEIGHT_CONFIG, reweight_var=None):
+
+    splitter = TreeSplitter(mc_rootfile, binning_config)
+
+    pad_width = len(str(splitter.total_bins - 1))
+    bin_output_dir = os.path.join(batch_output_dir, f"bin_{flat_bin_idx:0{pad_width}d}")
+    os.makedirs(bin_output_dir, exist_ok=True)
 
     print("\n" + "=" * 60)
-    print(f"Processing bin {flat_bin_idx}/{total_bins - 1}")
+    print(f"Processing bin {flat_bin_idx}/{splitter.total_bins - 1}")
     print("=" * 60)
+
+    mc_bin_rootfile = os.path.join(bin_output_dir, f"temp_bin_{flat_bin_idx}.root")
+    if not os.path.exists(mc_bin_rootfile):
+        splitter.create_bin_snapshot(flat_bin_idx, mc_bin_rootfile, vec_branches)
+    else :
+        print(f"Bin snapshot already exists: {mc_bin_rootfile}, skipping creation.")
 
     data_rootfile = os.path.join(data_root_dir, f"temp_bin_{flat_bin_idx}.root")
     splot_rootfile = os.path.join(splot_root_dir, f"bin_{flat_bin_idx:0{pad_width}d}_splot_output.root")
@@ -251,68 +261,9 @@ def process_single_bin(flat_bin_idx, binning_config, var_list, data_root_dir, sp
     if not os.path.exists(splot_rootfile):
         print(f"Error: sPlot file not found: {splot_rootfile}")
         sys.exit(1)
-
-    test_file = R.TFile.Open(data_rootfile, "READ")
-    if test_file.IsZombie():
-        print(f"Error: Data file is zombie (corrupted): {data_rootfile}")
-        test_file.Close()
-        sys.exit(1)
-
-    test_tree = test_file.Get("event")
-    if not test_tree:
-        print(f"Error: 'event' tree not found in {data_rootfile}")
-        test_file.Close()
-        sys.exit(1)
-
-    n_entries = test_tree.GetEntries()
-    test_file.Close()
-
-    if n_entries == 0:
-        print(f"Error: Data file has 0 entries: {data_rootfile}")
-        sys.exit(1)
-
-    print(f"Data file valid: {n_entries} entries")
-
-    bin_idx = []
-    remaining = flat_bin_idx
-    for i in range(len(bins)):
-        divisor = int(np.prod(bins[i + 1:])) if i + 1 < len(bins) else 1
-        bin_idx.append(remaining // divisor)
-        remaining = remaining % divisor
-
-    bin_names = list(binning_config.keys())
-    bin_str = ", ".join([f"{name.split('_')[-1]}_bin={idx}" for name, idx in zip(bin_names, bin_idx)])
-    print(f"Bin indices: {bin_str}")
-
-    bin_conditions = []
-    for i, (var_name, bin_edges) in enumerate(binning_config.items()):
-        idx = bin_idx[i]
-        condition = f"{var_name} >= {bin_edges[idx]} && {var_name} < {bin_edges[idx + 1]}"
-        bin_conditions.append(condition)
-    bin_condition = " && ".join(bin_conditions)
-
-    print(f"Bin condition: {bin_condition}")
-
-    print(f"Loading MC file: {mc_rootfile}")
-    df_mc_full = R.RDataFrame("event", mc_rootfile)
-
-    particle_vars = var_list.copy()
-    if mc_weight_config is not None:
-        for var in mc_weight_config.values():
-            particle_vars.append(var)
-    print(particle_vars)
-
-    df_mc_bin = df_mc_full
-    for var in particle_vars:
-        if var in df_mc_full.GetColumnNames():
-            df_mc_bin = df_mc_bin.Redefine(var, f"{var}[{bin_condition}]")
-
-    df_mc_bin = df_mc_bin.Filter(f"Any({bin_condition})")
-
+    
     df_data = R.RDataFrame("event", data_rootfile)
-
-    bin_output_dir = os.path.join(batch_output_dir, f"bin_{flat_bin_idx:0{pad_width}d}")
-    os.makedirs(bin_output_dir, exist_ok=True)
+    df_mc_bin = R.RDataFrame("event", mc_bin_rootfile)
 
     comparer = DataMcComparer(splot_rootfile, df_data, df_mc_bin, bin_output_dir)
     comparer.get_splot_map()

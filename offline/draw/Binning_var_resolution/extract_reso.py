@@ -2,7 +2,7 @@
 
 import ROOT as R
 from DRAW import style_draw, HistStyle
-from math import sqrt
+from math import pi, sqrt
 import os
 
 def extract_reso(hist_reso, output_name = None):
@@ -32,7 +32,7 @@ def extract_reso(hist_reso, output_name = None):
     #double_gaus.SetParLimits(4, 0.0001, 0.05)    
 
     hist_reso.Fit(double_gaus, "RQ")
-    c = style_draw((hist_reso,), f"./images_reso/reso_{hist_reso.GetName()}.png", leg_texts=[], styles=[HistStyle.line_hist(1)], save = False)
+    c = style_draw([hist_reso,], f"./images_reso/reso_{hist_reso.GetName()}.png", leg_texts=[], styles=[HistStyle.line_hist(1)], save = False)
 
     para = [double_gaus.GetParameter(i) for i in range(double_gaus.GetNpar())]
     #sigma = sqrt(para[0]/(para[0] +para[3]) *para[2]**2 + para[3]/(para[0] + para[3]) *para[5]**2 ) 
@@ -82,7 +82,7 @@ def brush(h_gen, h_reco, output_name = None):
 
     c_all.Update()
 
-    style_draw([h_gen, h_reco], "", ["generate","reconstruct"],styles = [HistStyle.line_hist(4, 1, 2), HistStyle.error_bars(1)], pad = pad1, save=False, log_y= True)
+    style_draw([h_gen, h_reco], "", ["generate","reconstruct"],styles = [HistStyle.line_hist(4, 1, 2), HistStyle.error_bars(1)], pad = pad1, save=False, log_y= False)
 
     h_ratio = h_gen.Clone("h_ratio")
     h_ratio.Sumw2()
@@ -158,9 +158,10 @@ def phi_var(rootFile_path, cutThrust = False):
               "xp": (-0.01, 0.01, 100, "", 0, 1, 100),
               "helicity_angle": (-0.05, 0.05, 100, "", -1, 1, 100),
               "thrust_pt": (-1.5, 1.5, 300, "MeV", 0, 3.5, 100),
-              "pt_zQ": (-0.25, 0.25, 100, "", 0, 0.5, 100)}
+              "pt_zQ": (-0.25, 0.25, 100, "", 0, 0.5, 100),
+              "helicity_phi": (-0.14, 0.14, 280, "", 0, pi/4, 100)}
     
-    var_latex_dict = {"M":"M_{#phi}", "z":"z", "xp":"x_{p}", "helicity_angle":"cos#theta^{#star}", "thrust_pt":"p_{t}", "pt_zQ":"p_{t}/zQ"}
+    var_latex_dict = {"M":"M_{#phi}", "z":"z", "xp":"x_{p}", "helicity_angle":"cos#theta^{#star}", "thrust_pt":"p_{t}", "pt_zQ":"p_{t}/zQ", "helicity_phi":"#phi^{#star}"}
     
     df = R.RDataFrame("event", rootFile_path)
     sqrts = 10.516469955444336 
@@ -168,7 +169,8 @@ def phi_var(rootFile_path, cutThrust = False):
     if cutThrust:
         df = df.Filter("thrust > 0.8", "thrust cut")
     #for var in ["M", "z", "helicity_angle", "thrust_pt", "xp"]:
-    for var in ["pt_zQ"]:
+    #for var in ["pt_zQ"]:
+    for var in ["helicity_phi", "helicity_angle"]:
         varname = f"phi_{var}"
 
         df = df.Filter(f"{varname}.size() == phi_gen_{var}.size()", "match count")
@@ -190,7 +192,7 @@ def phi_var(rootFile_path, cutThrust = False):
 
         print(f"{var} resolution: {sigma*1000:.2f} {var_config[var][3]}")
 
-        df.Snapshot("event", "temp.root")
+        #df.Snapshot("event", "temp.root")
 
 def event_var(rootFile_path, cutThrust = False):
 
@@ -220,11 +222,16 @@ def event_var(rootFile_path, cutThrust = False):
 
 
 if __name__ == "__main__":
+    """ past config
     rootFile_path = "/gpfs/group/belle2/users2022/luruihua/for_wangz/data_gMC_belle1/2025-11-25_SpinAlignment_gMC/continuum_reco_truth_matched.root" 
     rootFile_path_evt = "/gpfs/group/belle2/users2022/luruihua/for_wangz/data_gMC_belle1/2025-11-25_SpinAlignment_gMC/continuum.root" 
     #event_var(rootFile_path_evt)
     #event_var(rootFile_path_evt, cutThrust= True)
     phi_var(rootFile_path, cutThrust= False)
     #phi_var(rootFile_path, cutThrust= True)
+    """
+
+    rootFile_path = "~/reco_truth_match.root"
+    phi_var(rootFile_path, cutThrust= False)
     
 

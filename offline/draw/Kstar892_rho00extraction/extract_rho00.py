@@ -6,15 +6,13 @@ from DRAW import style_draw, HistStyle
 from FIT import fit_rho00
 import math
 
-Z_BIN_CONFIG = (13, 0.15, 0.8)
-#Z_BIN_CONFIG = (1, 0.75, 0.8)
-COSTHETA_BIN_CONFIG = (10, -1, 1)
-#COSTHETA_BIN_CONFIG = (8, -0.8, 0.8)
+Z_BIN_CONFIG = (12, 0.25, 0.85)
+#COSTHETA_BIN_CONFIG = (10, -1, 1)
+COSTHETA_BIN_CONFIG = (8, -0.8, 0.8)
 
-Z_BIN_NAME = "Ks_z_center"
-COSTHETA_BIN_NAME = "Ks_helicity_angle_center"
-PID_WEIGHT_NAME = "Ks_weight"
-
+HELICITY_BRANCH_NAME = "Kstar_helicity_angle"
+Z_BRANCH_NAME = "Kstar_z"
+WEIGHT_BRANCH_NAME = "Kstar_weight"
 
 def get_efficiency_hist(reco_rootFile, truth_rootFile, output_dir):
     eff_rootFile = os.path.join(output_dir, "efficiency_2D.root")
@@ -27,13 +25,14 @@ def get_efficiency_hist(reco_rootFile, truth_rootFile, output_dir):
         hist_model = R.RDF.TH2DModel("hist_eff", ";cos#theta;z", COSTHETA_BIN_CONFIG[0], COSTHETA_BIN_CONFIG[1], COSTHETA_BIN_CONFIG[2],
                                             Z_BIN_CONFIG[0], Z_BIN_CONFIG[1], Z_BIN_CONFIG[2])
 
-        hist_reco = rdf_reco.Histo2D(hist_model, COSTHETA_BIN_NAME, Z_BIN_NAME, PID_WEIGHT_NAME).GetValue()
-        hist_truth = rdf_truth.Histo2D(hist_model, COSTHETA_BIN_NAME, Z_BIN_NAME).GetValue()
+        hist_reco = rdf_reco.Histo2D(hist_model, HELICITY_BRANCH_NAME, Z_BRANCH_NAME, WEIGHT_BRANCH_NAME).GetValue()
+        hist_truth = rdf_truth.Histo2D(hist_model, HELICITY_BRANCH_NAME, Z_BRANCH_NAME).GetValue()
 
         eff = R.TEfficiency(hist_reco, hist_truth)
+        R.TEfficiency.SetUseWeightedEvents(eff, True)
         eff.SetName("eff_costheta_z")
         eff.SetTitle("Efficiency vs cos#theta and z;cos#theta;z;Efficiency")
-        
+            
         # For visualization, create a histogram from TEfficiency
         hist_eff = hist_reco.Clone("hist_eff")
         for i in range(1, hist_eff.GetNbinsX() + 1):
@@ -52,12 +51,14 @@ def get_efficiency_hist(reco_rootFile, truth_rootFile, output_dir):
 
         hist_eff.Write()
         hist_reco.Write("hist_reco")    
+        hist_truth.Write("hist_truth")
         output_file.Close()
     else : 
         eff_file = R.TFile.Open(eff_rootFile, "READ")
         hist_eff = eff_file.Get("hist_eff")
         hist_eff.SetDirectory(0)  # Detach from file
 
+        hist_truth = eff_file.Get("hist_truth")
         hist_reco = eff_file.Get("hist_reco")
 
     R.gStyle.SetOptStat(0)
@@ -71,22 +72,109 @@ def get_efficiency_hist(reco_rootFile, truth_rootFile, output_dir):
     R.gStyle.SetPaintTextFormat(".0f")
     hist_reco.Draw("COLZ TEXT")
     c.SaveAs(os.path.join(output_dir, "reco_count_costheta_vs_z.png"))
+    c.cd()
+    hist_truth.Draw("COLZ TEXT")
+    c.SaveAs(os.path.join(output_dir, "truth_count_costheta_vs_z.png"))
     
     return hist_eff
     
 
+
+def get_efficiency_hist_from_fit(csv_file, truth_rootFile, output_dir):
+
+    eff_rootFile = os.path.join(output_dir, "efficiency_2D.root")
+
+    z_bin_name = Z_BRANCH_NAME + "_center"
+    phi_bin_name = HELICITY_BRANCH_NAME + "_center"
+
+    df = pd.read_csv(csv_file)
+    df_valid = df[(df['nsig'] > 0) | (df[z_bin_name] > 0)].reset_index(drop=True)
+    df_valid = df_valid[(df_valid[z_bin_name] >= Z_BIN_CONFIG[1]) & (df_valid[z_bin_name] <= Z_BIN_CONFIG[2])].reset_index(drop=True)
+
+    if not os.path.exists(eff_rootFile):
+
+        # Build hist_reco from CSV nsig (fit-based reco yield)
+        hist_reco = R.TH2D("hist_reco", ";cos#theta^{*};z",
+                           COSTHETA_BIN_CONFIG[0], COSTHETA_BIN_CONFIG[1], COSTHETA_BIN_CONFIG[2],
+                           Z_BIN_CONFIG[0],   Z_BIN_CONFIG[1],   Z_BIN_CONFIG[2])
+        for _, row in df_valid.iterrows():
+            phi_c = row[phi_bin_name]
+            z_c   = row[z_bin_name]
+            nsig  = row['nsig']
+            nsig_err = row['nsig_err_hi']
+            bx = hist_reco.GetXaxis().FindBin(phi_c)
+            by = hist_reco.GetYaxis().FindBin(z_c)
+            hist_reco.SetBinContent(bx, by, max(nsig, 0))
+            hist_reco.SetBinError(bx, by, nsig_err)
+
+        # Build hist_truth from truth ROOT file
+        rdf_truth = R.RDataFrame("truth", truth_rootFile)
+        hist_truth = rdf_truth.Histo2D(
+            R.RDF.TH2DModel("hist_truth", ";cos#theta^{*};z",
+                            COSTHETA_BIN_CONFIG[0], COSTHETA_BIN_CONFIG[1], COSTHETA_BIN_CONFIG[2],
+                            Z_BIN_CONFIG[0],   Z_BIN_CONFIG[1],   Z_BIN_CONFIG[2]),
+            HELICITY_BRANCH_NAME, Z_BRANCH_NAME).GetValue()
+
+        # Compute efficiency = nsig_fit / n_truth
+        hist_eff = hist_reco.Clone("hist_eff")
+        hist_eff.Reset()
+        for i in range(1, hist_eff.GetNbinsX() + 1):
+            for j in range(1, hist_eff.GetNbinsY() + 1):
+                n_truth = hist_truth.GetBinContent(i, j)
+                n_reco  = hist_reco.GetBinContent(i, j)
+                n_reco_err = hist_reco.GetBinError(i, j)
+                if n_truth > 0:
+                    eff_val = n_reco / n_truth
+                    eff_err = n_reco_err / n_truth
+                else:
+                    eff_val, eff_err = 0.0, 0.0
+                hist_eff.SetBinContent(i, j, eff_val)
+                hist_eff.SetBinError(i, j, eff_err)
+
+        output_file = R.TFile(eff_rootFile, "RECREATE")
+        hist_eff.Write()
+        hist_reco.Write("hist_reco")
+        hist_truth.Write("hist_truth")
+        output_file.Close()
+    else:
+        eff_file = R.TFile.Open(eff_rootFile, "READ")
+        hist_eff = eff_file.Get("hist_eff")
+        hist_eff.SetDirectory(0)
+        hist_reco = eff_file.Get("hist_reco")
+        hist_truth = eff_file.Get("hist_truth")
+
+    R.gStyle.SetOptStat(0)
+    c = R.TCanvas("c_eff_final", "c_eff_final", 800, 600)
+    R.gStyle.SetPaintTextFormat(".3f")
+    hist_eff.Draw("COLZ TEXT")
+    c.SaveAs(os.path.join(output_dir, "efficiency_phi_vs_z.png"))
+
+    # test
+    c.cd()
+    R.gStyle.SetPaintTextFormat(".0f")
+    hist_reco.Draw("COLZ TEXT")
+    c.SaveAs(os.path.join(output_dir, "reco_count_costheta_vs_z.png"))
+    c.cd()
+    hist_truth.Draw("COLZ TEXT")
+    c.SaveAs(os.path.join(output_dir, "truth_count_costheta_vs_z.png"))
+    
+    return hist_eff
+
 def extract_rho00(nsig_txt:str, output_dir:str, eff_hist:R.TH2):
     df = pd.read_csv(nsig_txt)
 
+    z_center_col = Z_BRANCH_NAME + "_center"
+    helicity_col = HELICITY_BRANCH_NAME + "_center"
+
     # filter invalid data
-    df_valid = df[(df['nsig'] > 0) | (df[Z_BIN_NAME] > 0)].reset_index(drop=True)
+    df_valid = df[(df['nsig'] > 0) | (df[z_center_col] > 0)].reset_index(drop=True)
     
     # the range i wanna use
-    df_valid = df_valid[(df_valid[Z_BIN_NAME] >= Z_BIN_CONFIG[1]) & (df_valid[Z_BIN_NAME] <= Z_BIN_CONFIG[2])].reset_index(drop=True)
+    df_valid = df_valid[(df_valid[z_center_col] >= Z_BIN_CONFIG[1]) & (df_valid[z_center_col] <= Z_BIN_CONFIG[2])].reset_index(drop=True)
 
-    grouped = df_valid.groupby(Z_BIN_NAME)
+    grouped = df_valid.groupby(z_center_col)
 
-    unique_z = sorted(df_valid[Z_BIN_NAME].unique())
+    unique_z = sorted(df_valid[z_center_col].unique())
     unique_z = [x for x in unique_z if x > 0]
 
     z_values = []
@@ -100,8 +188,8 @@ def extract_rho00(nsig_txt:str, output_dir:str, eff_hist:R.TH2):
         hist = R.TH1F(f"hist_z_{z_value:.3f}", f"z = {z_value:.3f};" + "cos#theta^{*};N_{sig}/#varepsilon", COSTHETA_BIN_CONFIG[0], COSTHETA_BIN_CONFIG[1], COSTHETA_BIN_CONFIG[2])
         
         for i in range(len(group)):
-            cos_theta = group[COSTHETA_BIN_NAME].values[i]
-            z_center = group[Z_BIN_NAME].values[i]
+            cos_theta = group[helicity_col].values[i]
+            z_center = group[z_center_col].values[i]
             nsig = group['nsig'].values[i]
             nsig_err = group['nsig_err_hi'].values[i]
             
@@ -127,6 +215,7 @@ def extract_rho00(nsig_txt:str, output_dir:str, eff_hist:R.TH2):
             bin_idx = hist.FindBin(cos_theta)
             hist.SetBinContent(bin_idx, corrected_nsig)
             hist.SetBinError(bin_idx, corrected_err)
+        style_draw([hist],"temp.png")
 
         value, err = fit_rho00(hist, os.path.join(output_dir, f"fit_{idx:02d}.png"), True, extra_legend=f"{z_value - 0.025:.2f} < z < {z_value + 0.025:.2f}")
         z_values.append(z_value)
@@ -157,7 +246,7 @@ def extract_rho00(nsig_txt:str, output_dir:str, eff_hist:R.TH2):
     c.SaveAs(os.path.join(output_dir, "rho00_vs_z.png"))
         
     with open(os.path.join(output_dir, "rho00_results.csv"), 'w') as f:
-        f.write('#z_center,rho00,rho00_error\n')
+        f.write('z_center,rho00,rho00_error\n')
         for z, rho00, rho00_err in zip(z_values, rho00_values, rho00_errors):
             f.write(f'{z:.4f},{rho00:.6f},{rho00_err:.6f}\n')
     print(f"fitting result has been saved to rho00_results.csv")
@@ -168,17 +257,12 @@ def extract_rho00(nsig_txt:str, output_dir:str, eff_hist:R.TH2):
         
 
 if __name__ == "__main__":
-    truth_rootFile = "/gpfs/group/belle/users/wangz/data_gMC_belle1/KsSpinAlignment_v2.3.3_qqbar_svd2/svd2_only/svd2_st0_truth_processed.root"
-    reco_rootFile = "./rootFiles/sig_isSignal_v2.3.3.root"
+    truth_rootFile = "/gpfs/group/belle/users/dues/data_gMC_belle1/Kstar892SpinAlignment_v1.0.0_qqbar_svd2_duxs/truth.root"
+    MC_fit_csv = "./fit_results/MC_fit/nsig_results.csv"
     nsig_txt = "./fit_results/data_fit/nsig_results.csv"
-    output_dir = "./images/rho00/data_bin10/"
-    #output_dir = "./images/rho00/data_bin10_without_weight/"
+    output_dir = "./images/rho00/data/"
     os.makedirs(output_dir, exist_ok=True)
+    #hist_eff  = get_efficiency_hist(reco_rootFile, truth_rootFile, "./images/") 
 
-    hist_eff  = get_efficiency_hist(reco_rootFile, truth_rootFile, "./images/") 
-    #hist_eff  = get_efficiency_hist(reco_rootFile, truth_rootFile, "./images/rho00/data_bin10_without_weight/") 
+    hist_eff = get_efficiency_hist_from_fit(MC_fit_csv, truth_rootFile, output_dir)
     extract_rho00(nsig_txt, output_dir, hist_eff)
-    
-    #reco_rootFile = "/gpfs/group/belle/users/wangz/Work/SpinAlignment/offline/draw/Ks_null_test/images/data_mc_comparing/pip_costheta_reweighted_MC_combined.root"
-    #hist_eff  = get_efficiency_hist(reco_rootFile, truth_rootFile, "test") 
-    #extract_rho00(nsig_txt, "test", hist_eff)

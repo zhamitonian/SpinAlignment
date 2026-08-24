@@ -5,7 +5,7 @@ import os
 
 from FIT.generic_fit import *
 
-def wrapper_func(tree, output_dir, log_file, bin_fit_range, branches_name, binned_fit):
+def wrapper_func(tree, output_dir, log_file, bin_fit_range, binned_fit):
 
     ranges = bin_fit_range.split(';')
     range_txt = []
@@ -14,7 +14,7 @@ def wrapper_func(tree, output_dir, log_file, bin_fit_range, branches_name, binne
         range_txt.append(range_str)
     bin_index = int(log_file.split("_")[-1].split(".")[0])
 
-    #----------------------------------------------
+    #---------------------------------------------
     # sig MC fit
     sigma_initial_vaule = 0.006
     bin_cate2 = [91, 92, 93, 97, 98, 101, 105, 123, 127, 132, 145, 150, 151, 152, 154, 157]
@@ -53,7 +53,7 @@ def wrapper_func(tree, output_dir, log_file, bin_fit_range, branches_name, binne
                         "gauss": {"label" : "Gaussian", "color" : R.kGreen + 2, "style" : 7, "width" : 3},},
         "legend" : {"extra_text" : range_txt,}, "logy" : True, "show_pull" : False})
 
-    dataset_config = DatasetConfig(binned_fit=True, branches_name=branches_name, perform_splot=False,weight_branch="Ks_weight")
+    dataset_config = DatasetConfig(binned_fit=True, target_branch=["Ks_M"], perform_splot=False,weight_branch="Ks_weight")
     fit_config = FitterConfig(two_step_fit=True, use_minos=False)
 
     fitter_mc = GenericFit(MC_tree, MC_output_dir, log_file=MC_log_file, fit_definition=pdf_config, 
@@ -93,13 +93,12 @@ def wrapper_func(tree, output_dir, log_file, bin_fit_range, branches_name, binne
         "legend" : {"extra_text" : range_txt,}, 
         "show_pull" :False, "logy":True})
     mc_constrins = (result_mc, ["a", "alpha_r", "nl", "nr", "alpha_l", "k", "frac" , "sigma", "mean"])
-    #dataset_config = DatasetConfig(binned_fit= binned_fit, branches_name=branches_name, perform_splot=False)
-    dataset_config = DatasetConfig(binned_fit= binned_fit, branches_name=branches_name, perform_splot=True)
+    dataset_config = DatasetConfig(binned_fit= binned_fit,  target_branch=["Ks_M"], perform_splot=False)
     fit_config = FitterConfig(two_step_fit=True, use_minos=False)
 
     fitter_data = GenericFit(tree, output_dir, log_file=log_file,fit_definition=pdf_config,
                     dataset_config=dataset_config, plot_config=plot_config, fitter_config=fit_config, mc_constrains=mc_constrins)
-    fitter_data.run()
+    
     result_data, yield_results = fitter_data.run()
     nsig, nsig_err = yield_results["nsig"], yield_results["nsig_err"]
 
@@ -117,7 +116,7 @@ def wrapper_func(tree, output_dir, log_file, bin_fit_range, branches_name, binne
 
 
 def fit():
-    quick_fit = QUICK_FIT(wrapper_func, [("Ks_z", 0, 1, 20), ("Ks_helicity_angle", -1, 1, 10)])
+    quick_fit = QUICK_FIT(wrapper_func, {"Ks_z": (20, 0, 1), "Ks_helicity_angle": (10, -1, 1)})
     quick_fit.parse_arguments()
 
 if __name__ == "__main__":

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-from FIT import QUICK_FIT
+from FIT.utils import QUICK_FIT
 import ROOT as R
 import os
 
 from FIT.generic_fit import *
 
-def wrapper_func(tree, output_dir, log_file, bin_fit_range, branches_name, binned_fit):
+def wrapper_func(tree, output_dir, log_file, bin_fit_range, binned_fit):
 
     ranges = bin_fit_range.split(';')
     range_txt = []
@@ -19,10 +19,9 @@ def wrapper_func(tree, output_dir, log_file, bin_fit_range, branches_name, binne
         "components" : {"model" : {"label" : "Total Fit", "color" : 4},
                         "DSCB": {"label" : "DSCB", "color" : 2, "style" : 4, "width" : 3},
                         "gauss": {"label" : "Gaussian", "color" : R.kGreen + 2, "style" : 7, "width" : 3},},
-                        #"gauss2": {"label" : "Gaussian2", "color" : R.kAzure + 2, "style" : 7, "width" : 3},},
-                        #"bifur_gauss": {"label" : "bifur_guass", "color" : R.kAzure + 2, "style" : 7, "width" : 3},},
-        "legend" : {"extra_text" : range_txt,}, "logy" : False, "show_pull" : False})
-    dataset_config = DatasetConfig(binned_fit= binned_fit, branches_name=branches_name, perform_splot=False,weight_branch="Ks_weight")
+                        #"sig": {"label" : "Gaussian", "color" : R.kGreen + 2, "style" : 7, "width" : 3},},
+        "legend" : {"extra_text" : range_txt,}, "logy" :True, "show_pull" : False})
+    dataset_config = DatasetConfig(binned_fit= binned_fit, perform_splot=False,weight_branch="Ks_weight")
     fit_config = FitterConfig(two_step_fit=True, use_minos=False)
 
     sigma_initial_vaule = 0.006
@@ -57,9 +56,10 @@ def wrapper_func(tree, output_dir, log_file, bin_fit_range, branches_name, binne
                         {"mean":"mean", "sigma":"sigma * k2[1, 0.001, 100]"}),
                 PDFSpec("bifur_gauss", "Ks_M", "bifur_gauss",
                         {"mean":"mean", "sigma_left":"sigma *kl[1, 0.001, 100]", "sigma_right":"sigma * kr[1, 0.001, 100]"}),
-                PDFSpec("bkg", "Ks_M", "chebychev", {"order":1})],
-                #model = "SUM(frac[0.3,0,0.8]*DSCB, bifur_gauss)")
+                PDFSpec("bkg", "Ks_M", "chebychev", {"order":1}),
+                PDFSpec("sig", "Ks_M", "composite", {"formula" : "SUM(frac[0.3,0,0.8]*DSCB, gauss)"})],
                 model = "SUM(frac[0.3,0,0.8]*DSCB, gauss)")
+                #model = "sig")
                 #model = "SUM(frac[0.3,0,0.8]*DSCB, frac2[0.5,0.3, 0.9]*gauss, gauss2)")
 
         log_file_i = os.path.splitext(log_file)[0] + f"_{i:0{pad_width}d}.log"
@@ -86,7 +86,7 @@ def wrapper_func(tree, output_dir, log_file, bin_fit_range, branches_name, binne
 
 
 def fit():
-    quick_fit = QUICK_FIT(wrapper_func, [("Ks_z", 0, 1, 20), ("Ks_helicity_angle", -1, 1, 10)])
+    quick_fit = QUICK_FIT(wrapper_func, {"Ks_z": (20, 0, 1), "Ks_helicity_angle": (10, -1, 1)})
     quick_fit.parse_arguments()
 
 if __name__ == "__main__":

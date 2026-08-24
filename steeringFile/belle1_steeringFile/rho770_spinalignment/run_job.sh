@@ -55,6 +55,7 @@ path add_condition main =<:0:KILL
 #data type: MC=1 for simulation,MC=0 for experiment.
 
 module put_parameter SpinAlignment  output_filename\./test.root
+#module put_parameter SpinAlignment  output_filename\/gpfs/home/belle2/wangz/Work/SpinAlignment/offline/draw/thrust_test/rootFiles/no_kl.root
 
 #module put_parameter SpinAlignment isMCSample\1
 #module put_parameter SpinAlignment rmMCTree\0

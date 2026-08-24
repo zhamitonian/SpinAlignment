@@ -44,29 +44,27 @@ export BASF_USER_INIT=user_init.so
 
 basf << EOF #>& ./exp71_rs2249_re2348_evtgen-uds_0.log
 
-module register fix_mdst SpinAlignment
+module register fix_mdst KsSpinAlignment_NullTest
 path create main
 #path create Analysis
-path add_module main fix_mdst SpinAlignment
+path add_module main fix_mdst KsSpinAlignment_NullTest
 
 path add_condition main >:0:EXIT
 path add_condition main =<:0:KILL
 
 #data type: MC=1 for simulation,MC=0 for experiment.
 
-module put_parameter SpinAlignment  output_filename\./test.root
+module put_parameter KsSpinAlignment_NullTest  output_filename\./test.root
 
-#module put_parameter SpinAlignment isMCSample\1
-#module put_parameter SpinAlignment rmMCTree\0
-##mother particle: Y1S/Y2S/Y3S/Y4S/Y4Scon(40)/Y5S
-#module put_parameter  SpinAlignment YnsNo\40
+#module put_parameter KsSpinAlignment_NullTest isMCSample\1
+#module put_parameter KsSpinAlignment_NullTest rmMCTree\0
 
 initialize
 #histogram define exp71_rs2249_re2348_evtgen-uds_0.hbk
 
 #MC or experiment data for procession
 #process_event /group/belle/bdata_b/dstprod/dat/e000069/HadronBJ/0127/continuum/08/HadronBJ-e000069r000823-b20090127_0910.mdst 1000
-process_event /group/belle/bdata_b/mcprod/dat/e000065/evtgen/uds/00/all/0127/continuum/06/evtgen-uds-00-all-e000065r000626-b20090127_0910.mdst 1000
+process_event /group/belle/bdata_b/mcprod/dat/e000065/evtgen/uds/00/all/0127/continuum/06/evtgen-uds-00-all-e000065r000626-b20090127_0910.mdst
 #process_url http://bweb3/montecarlo.php?ex=7&rs=1490&re=1690&ty=evtgen-uds&dt=continuum&bl=caseB&st=20 
 
 

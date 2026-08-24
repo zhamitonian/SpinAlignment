@@ -35,9 +35,9 @@ def process_rootFile(rootFile, sig_path, bkg_path):
     hist_cosTheta_z.Draw("COLZ TEXT")
     c.SaveAs(os.path.join("images", "bkg_Ks_costheta_vs_z.png"))
 
-def check_isSignal(rootFile):
-    rootFile_bkg = "./rootFiles/svd2_only_v2.3.3/bkg_isSignal_v2.3.3_with_MCGen.root"
-    rootFile_sig = "./rootFiles/svd2_only_v2.3.3/sig_isSignal_v2.3.3.root"
+def check_isSignal(rootFile):  # get truth-matched MC
+    rootFile_bkg = "./rootFiles/bkg_isSignal_v2.3.3_with_MCGen.root"
+    rootFile_sig = "./rootFiles/sig_isSignal_v2.3.3.root"
     if not os.path.exists(rootFile_bkg) or not os.path.exists(rootFile_sig):
         rdf = R.RDataFrame("event", rootFile)
         #rdf = rdf.Filter("n_ks_truth == 0", "background region")
@@ -62,7 +62,7 @@ def check_isSignal(rootFile):
         rdf = rdf.Define("Ks_z", "2*Ks_E/sqrts")
 
         Ks_variables = ["M", "z", "p", "costheta", "phi", "helicity_angle", "weight"]
-        pion_variables = ["p", "costheta", "phi", "pid_weight"]
+        pion_variables = ["p", "costheta", "phi", "pid_weight", "index"]
         rdfs = {}
         for label, condition, output in [
             ("bkg", "!pip_isSignal || !pim_isSignal", rootFile_bkg),
@@ -92,7 +92,7 @@ def check_isSignal(rootFile):
     hist_model = R.RDF.TH1DModel("", ";M(K_{s});[MeV]", 200, 0.47, 0.52)
     h_bkg_isSignal = rdf_bkg.Histo1D(hist_model, "Ks_M")
 
-    rdf_bkg_truth = R.RDataFrame("event", "rootFiles/svd2_4Soffres_st0_v2.3.3_bkg.root")
+    rdf_bkg_truth = R.RDataFrame("event", "rootFiles/obsolete/svd2_4Soffres_st0_v2.3.3_bkg.root")
     h_bkg_truth = rdf_bkg_truth.Histo1D(hist_model, "Ks_M")
     style_draw([h_bkg_isSignal, h_bkg_truth], "./images/bkg_isSignal_check.png", ["bkg with isSignal", "bkg with truth match"], 
                 [HistStyle.line_hist(2), HistStyle.line_hist(4)], log_y=True)  
@@ -273,11 +273,12 @@ def main():
     bkg_path = "./rootFiles/svd2_4Soffres_st0_v2.3.3_bkg.root"
     isSignal_bkg_path = "rootFiles/bkg_isSignal_v2.3.3_with_MCGen.root"
     #process_rootFile(rootFile, sig_path, bkg_path) 
-    check_isSignal(rootFile)
     #isSignal_before_after()
-
     #bkg_fit(isSignal_bkg_path, "./fit_results/bkg_fit2/")
     #sig_fit(sig_path, "./fit_results/sig_fit/")
+
+    #----- get truth matched MC    
+    check_isSignal(rootFile)
 
 if __name__ == "__main__":
     main()
